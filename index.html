@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Мой канал · Чек-лист</title>
+  <meta name="theme-color" content="#0f0f13" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Чек-лист" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f0f13; color: #f0ece8; font-family: Georgia, serif; }
+    ::-webkit-scrollbar { display: none; }
+    input:focus { outline: none; }
+    button:hover { opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <script type="text/babel">
+    // ============================================================
+    // 🔥 ВОТ СЮДА ВСТАВЬ СВОИ ДАННЫЕ ОТ FIREBASE (шаг 3 инструкции)
+    // ============================================================
+    const firebaseConfig = {
+      apiKey:            "ВСТАВЬ_СЮДА",
+      authDomain:        "ВСТАВЬ_СЮДА",
+      projectId:         "ВСТАВЬ_СЮДА",
+      storageBucket:     "ВСТАВЬ_СЮДА",
+      messagingSenderId: "ВСТАВЬ_СЮДА",
+      appId:             "ВСТАВЬ_СЮДА",
+    };
+    // ============================================================
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
+
+    const STEPS = [
+      { id: 1,  phase: "📝 Подготовка",    task: "Придумать сценарий",                                        who: "Gemini + Claude" },
+      { id: 2,  phase: "🎬 Производство",   task: "Снять видео",                                               who: "Ты" },
+      { id: 3,  phase: "🎬 Производство",   task: "Смонтировать видео",                                        who: "Ты" },
+      { id: 4,  phase: "📤 Публикация",     task: "Загрузить ролик на YouTube",                                who: "Ты" },
+      { id: 5,  phase: "📤 Публикация",     task: "Выгрузить субтитры через YouTube",                          who: "Ты" },
+      { id: 6,  phase: "📤 Публикация",     task: "Перевести субтитры, название и описание на английский",     who: "Gemini" },
+      { id: 7,  phase: "📤 Публикация",     task: "Описание на русском и английском + заголовки",              who: "Gemini" },
+      { id: 8,  phase: "🎨 Оформление",    task: "Сделать обложку для YouTube",                               who: "ChatGPT" },
+      { id: 9,  phase: "📣 Продвижение",   task: "Написать пост в Сообщество YouTube",                        who: "Gemini / ChatGPT" },
+      { id: 10, phase: "📣 Продвижение",   task: "Выложить пост в Telegram с ссылкой на YouTube",             who: "ChatGPT" },
+      { id: 11, phase: "📣 Продвижение",   task: "Сделать фото / обложку для Telegram",                       who: "ChatGPT" },
+    ];
+
+    const WHO_COLORS = {
+      "Gemini + Claude": "#c4b5fd",
+      "Ты":              "#fda4af",
+      "Gemini":          "#93c5fd",
+      "ChatGPT":         "#6ee7b7",
+      "Gemini / ChatGPT":"#fde68a",
+    };
+
+    const phases = [...new Set(STEPS.map(s => s.phase))];
+
+    const defaultVideos = [
+      { id: 1, name: "Видео 1", checked: {} },
+      { id: 2, name: "Видео 2", checked: {} },
+      { id: 3, name: "Видео 3", checked: {} },
+    ];
+
+    function App() {
+      const [user,      setUser]      = React.useState(null);
+      const [loading,   setLoading]   = React.useState(true);
+      const [videos,    setVideos]    = React.useState(defaultVideos);
+      const [activeId,  setActiveId]  = React.useState(1);
+      const [editingId, setEditingId] = React.useState(null);
+      const [syncLabel, setSyncLabel] = React.useState("");
+      const saveTimer = React.useRef(null);
+
+      // Следим за входом/выходом
+      React.useEffect(() => {
+        return auth.onAuthStateChanged(u => {
+          setUser(u);
+          setLoading(false);
+        });
+      }, []);
+
+      // Загружаем данные из Firestore при входе
+      React.useEffect(() => {
+        if (!user) return;
+        return db.collection("users").doc(user.uid).onSnapshot(snap => {
+          if (snap.exists && snap.data().videos?.length) {
+            const v = snap.data().videos;
+            setVideos(v);
+            setActiveId(v[0].id);
+          }
+        });
+      }, [user]);
+
+      // Сохраняем в Firestore (с задержкой чтобы не спамить)
+      const saveToFirebase = (newVideos) => {
+        if (!user) return;
+        clearTimeout(saveTimer.current);
+        setSyncLabel("сохраняю...");
+        saveTimer.current = setTimeout(() => {
+          db.collection("users").doc(user.uid).set({ videos: newVideos }, { merge: true })
+            .then(() => setSyncLabel("✓ сохранено"))
+            .catch(() => setSyncLabel("⚠ ошибка"));
+        }, 600);
+      };
+
+      const updateVideos = (newVideos) => {
+        setVideos(newVideos);
+        saveToFirebase(newVideos);
+      };
+
+      const updateVideo = (id, patch) => {
+        const newVideos = videos.map(v => v.id === id ? { ...v, ...patch } : v);
+        updateVideos(newVideos);
+      };
+
+      const active = videos.find(v => v.id === activeId);
+
+      const toggle = (stepId) => {
+        const checked = { ...active.checked, [stepId]: !active.checked[stepId] };
+        updateVideo(activeId, { checked });
+      };
+
+      const resetVideo = () => updateVideo(activeId, { checked: {} });
+
+      const addVideo = () => {
+        const id = Date.now();
+        const newVideo = { id, name: `Видео ${videos.length + 1}`, checked: {} };
+        const newVideos = [...videos, newVideo];
+        updateVideos(newVideos);
+        setActiveId(id);
+        setEditingId(id);
+      };
+
+      const deleteVideo = (id) => {
+        const remaining = videos.filter(v => v.id !== id);
+        updateVideos(remaining);
+        if (activeId === id) setActiveId(remaining[0]?.id);
+      };
+
+      const login  = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+      const logout = () => auth.signOut();
+
+      const done  = active ? Object.values(active.checked).filter(Boolean).length : 0;
+      const total = STEPS.length;
+      const pct   = Math.round((done / total) * 100);
+
+      // ─── Загрузка ───────────────────────────────────────────────
+      if (loading) return (
+        <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <span style={{ color:"#444", fontStyle:"italic" }}>загружаю...</span>
+        </div>
+      );
+
+      // ─── Экран входа ─────────────────────────────────────────────
+      if (!user) return (
+        <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:20 }}>
+          <p style={{ color:"#555", fontSize:11, letterSpacing:3, textTransform:"uppercase" }}>мой канал</p>
+          <h1 style={{ fontSize:26, fontWeight:"normal", fontStyle:"italic" }}>Чек-лист выпуска</h1>
+          <button onClick={login} style={{
+            marginTop:12, background:"#161619", border:"1px solid #2a2a3a",
+            color:"#f0ece8", padding:"13px 30px", borderRadius:12,
+            cursor:"pointer", fontSize:15, fontFamily:"Georgia,serif",
+          }}>
+            🔑 Войти через Google
+          </button>
+        </div>
+      );
+
+      // ─── Основной экран ───────────────────────────────────────────
+      return (
+        <div style={{ minHeight:"100vh" }}>
+
+          {/* Шапка */}
+          <div style={{
+            display:"flex", alignItems:"center", justifyContent:"space-between",
+            padding:"8px 16px", borderBottom:"1px solid #1a1a1a",
+          }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <img src={user.photoURL} alt="" style={{ width:24, height:24, borderRadius:"50%" }} />
+              <span style={{ color:"#555", fontSize:12 }}>{user.displayName?.split(" ")[0]}</span>
+              <span style={{ color:"#2a3a2a", fontSize:10 }}>{syncLabel}</span>
+            </div>
+            <button onClick={logout} style={{
+              background:"transparent", border:"none", color:"#333",
+              cursor:"pointer", fontSize:11, fontFamily:"inherit",
+            }}>выйти</button>
+          </div>
+
+          {/* Вкладки */}
+          <div style={{
+            display:"flex", alignItems:"center", overflowX:"auto",
+            borderBottom:"1px solid #1e1e1e", padding:"0 16px", gap:4,
+          }}>
+            {videos.map(v => {
+              const vDone   = Object.values(v.checked).filter(Boolean).length;
+              const isActive = v.id === activeId;
+              return (
+                <div key={v.id}
+                  onClick={() => { setActiveId(v.id); setEditingId(null); }}
+                  style={{
+                    display:"flex", alignItems:"center", gap:6,
+                    padding:"12px 14px 10px", cursor:"pointer", flexShrink:0,
+                    borderBottom: isActive ? "2px solid #b5a4f7" : "2px solid transparent",
+                    transition:"all 0.15s",
+                  }}>
+                  {editingId === v.id ? (
+                    <input autoFocus value={v.name}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => updateVideo(v.id, { name: e.target.value })}
+                      onBlur={() => setEditingId(null)}
+                      onKeyDown={e => e.key === "Enter" && setEditingId(null)}
+                      style={{
+                        background:"transparent", border:"none",
+                        borderBottom:"1px solid #b5a4f7", color:"#f0ece8",
+                        fontFamily:"inherit", fontSize:13, width:120,
+                      }} />
+                  ) : (
+                    <span
+                      onDoubleClick={e => { e.stopPropagation(); setEditingId(v.id); }}
+                      style={{
+                        fontSize:13, color: isActive ? "#f0ece8" : "#555",
+                        maxWidth:130, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+                      }}>
+                      {v.name}
+                    </span>
+                  )}
+                  <span style={{ fontSize:10, color: vDone === total ? "#6ee7b7" : "#444", flexShrink:0 }}>
+                    {vDone === total ? "✓" : `${vDone}/${total}`}
+                  </span>
+                  {videos.length > 1 && isActive && (
+                    <span onClick={e => { e.stopPropagation(); deleteVideo(v.id); }}
+                      style={{ color:"#333", fontSize:12, cursor:"pointer", marginLeft:2 }}>✕</span>
+                  )}
+                </div>
+              );
+            })}
+            <div onClick={addVideo} style={{
+              padding:"12px 14px 10px", cursor:"pointer", color:"#444",
+              fontSize:20, flexShrink:0, borderBottom:"2px solid transparent",
+            }}>+</div>
+          </div>
+
+          {/* Контент */}
+          {active && (
+            <div style={{ maxWidth:560, margin:"0 auto", padding:"28px 16px" }}>
+
+              <div style={{ marginBottom:24 }}>
+                <p style={{ color:"#444", fontSize:11, letterSpacing:3, textTransform:"uppercase", marginBottom:6 }}>мой канал</p>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <h1 style={{ fontSize:22, fontWeight:"normal", fontStyle:"italic", cursor:"text" }}
+                    onDoubleClick={() => setEditingId(active.id)}>
+                    {active.name}
+                  </h1>
+                  <span onClick={() => setEditingId(active.id)} style={{ color:"#333", fontSize:13, cursor:"pointer" }}>✎</span>
+                </div>
+                <p style={{ color:"#444", fontSize:12, marginTop:6 }}>{done}/{total} шагов</p>
+              </div>
+
+              {/* Прогресс */}
+              <div style={{ height:3, background:"#1a1a1a", borderRadius:2, marginBottom:28, overflow:"hidden" }}>
+                <div style={{
+                  height:"100%", width:`${pct}%`,
+                  background:"linear-gradient(90deg,#b5a4f7,#f7c4a4)",
+                  borderRadius:2, transition:"width 0.4s ease",
+                }} />
+              </div>
+
+              {/* Шаги */}
+              {phases.map(phase => (
+                <div key={phase} style={{ marginBottom:24 }}>
+                  <p style={{ fontSize:10, letterSpacing:2, textTransform:"uppercase", color:"#444", marginBottom:8 }}>
+                    {phase}
+                  </p>
+                  {STEPS.filter(s => s.phase === phase).map(step => {
+                    const isDone = !!active.checked[step.id];
+                    return (
+                      <div key={step.id} onClick={() => toggle(step.id)} style={{
+                        display:"flex", alignItems:"center", gap:12,
+                        padding:"11px 12px", marginBottom:5, borderRadius:10,
+                        background: isDone ? "#1a1a22" : "#161619",
+                        border:`1px solid ${isDone ? "#2a2a3a" : "#1e1e1e"}`,
+                        cursor:"pointer", opacity: isDone ? 0.5 : 1, transition:"all 0.2s",
+                      }}>
+                        <div style={{
+                          width:18, height:18, borderRadius:5, flexShrink:0,
+                          border:`1.5px solid ${isDone ? "#6d5fd4" : "#333"}`,
+                          background: isDone ? "#6d5fd4" : "transparent",
+                          display:"flex", alignItems:"center", justifyContent:"center",
+                          transition:"all 0.2s",
+                        }}>
+                          {isDone && (
+                            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                              <path d="M1 3.5L3.5 6.5L9 1" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </div>
+                        <p style={{
+                          flex:1, margin:0, fontSize:13, lineHeight:1.4,
+                          color: isDone ? "#444" : "#e0dcd8",
+                          textDecoration: isDone ? "line-through" : "none",
+                        }}>{step.task}</p>
+                        <span style={{
+                          fontSize:10, padding:"2px 7px", borderRadius:20, whiteSpace:"nowrap", flexShrink:0,
+                          background:(WHO_COLORS[step.who]||"#888")+"20",
+                          color: WHO_COLORS[step.who]||"#888",
+                          border:`1px solid ${(WHO_COLORS[step.who]||"#888")}30`,
+                        }}>{step.who}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+
+              {done === total && (
+                <div style={{
+                  textAlign:"center", padding:20, background:"#161619",
+                  borderRadius:12, border:"1px solid #2a2a3a", marginTop:4,
+                }}>
+                  <p style={{ fontSize:24, marginBottom:4 }}>🎉</p>
+                  <p style={{ color:"#b5a4f7", fontStyle:"italic", fontSize:14 }}>Ролик выпущен! Умница.</p>
+                </div>
+              )}
+
+              <button onClick={resetVideo} style={{
+                marginTop:20, background:"transparent", border:"1px solid #1e1e1e",
+                color:"#333", padding:"7px 16px", borderRadius:8,
+                cursor:"pointer", fontSize:11, display:"block", width:"100%", fontFamily:"inherit",
+              }}>сбросить чек-лист этого видео</button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
