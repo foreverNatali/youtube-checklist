@@ -73,6 +73,7 @@
     function App() {
       const [user,      setUser]      = React.useState(null);
       const [loading,   setLoading]   = React.useState(true);
+      const isFirstLoad = React.useRef(true);
       const [videos,    setVideos]    = React.useState(defaultVideos);
       const [activeId,  setActiveId]  = React.useState(1);
       const [editingId, setEditingId] = React.useState(null);
@@ -83,11 +84,15 @@
 
       React.useEffect(() => {
         if (!user) return;
+        isFirstLoad.current = true;
         return db.collection("users").doc(user.uid).onSnapshot(snap => {
           if (snap.exists && snap.data().videos?.length) {
             const v = snap.data().videos;
             setVideos(v);
-            setActiveId(v[0].id);
+            if (isFirstLoad.current) {
+              setActiveId(v[0].id);
+              isFirstLoad.current = false;
+            }
           }
         });
       }, [user]);
