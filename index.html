@@ -1,326 +1,439 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Мой канал · Чек-лист</title>
-  <meta name="theme-color" content="#f5f0e8" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="Чек-лист" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <meta name="theme-color" content="#f5f0e8"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="Чек-лист"/>
+  <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #f5f0e8; color: #2a2420; font-family: Georgia, serif; }
-    ::-webkit-scrollbar { display: none; }
-    input:focus { outline: none; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#f5f0e8;color:#2a2420;font-family:Georgia,serif;-webkit-tap-highlight-color:transparent}
+    button{font-family:Georgia,serif;cursor:pointer}
+    input{font-family:Georgia,serif}
+    .scrollx{display:flex;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .scrollx::-webkit-scrollbar{display:none}
   </style>
 </head>
 <body>
-  <div id="root"></div>
+<div id="root" style="padding:40px;text-align:center;color:#9a8878;font-style:italic">загружаю...</div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════
+//  ДАННЫЕ
+// ═══════════════════════════════════════════════════════
+var STEPS = [
+  {id:1,  phase:"📝 Подготовка",   task:"Придумать сценарий",                                     who:"Gemini + Claude"},
+  {id:2,  phase:"🎬 Производство",  task:"Снять видео",                                            who:"Ты"},
+  {id:3,  phase:"🎬 Производство",  task:"Смонтировать видео",                                     who:"Ты"},
+  {id:4,  phase:"📤 Публикация",    task:"Загрузить ролик на YouTube",                             who:"Ты"},
+  {id:5,  phase:"📤 Публикация",    task:"Выгрузить субтитры через YouTube",                       who:"Ты"},
+  {id:6,  phase:"📤 Публикация",    task:"Перевести субтитры, название и описание на английский",  who:"Gemini"},
+  {id:7,  phase:"📤 Публикация",    task:"Описание на русском и английском + заголовки",           who:"Gemini"},
+  {id:8,  phase:"🎨 Оформление",   task:"Сделать обложку для YouTube",                            who:"ChatGPT"},
+  {id:9,  phase:"📣 Продвижение",  task:"Написать пост в Сообщество YouTube",                     who:"Gemini / ChatGPT"},
+  {id:10, phase:"📣 Продвижение",  task:"Выложить пост в Telegram с ссылкой на YouTube",          who:"ChatGPT"},
+  {id:11, phase:"📣 Продвижение",  task:"Сделать фото / обложку для Telegram",                    who:"ChatGPT"}
+];
+var WHO = {
+  "Gemini + Claude":  {bg:"#ede9fe",tx:"#6d28d9",br:"#c4b5fd"},
+  "Ты":               {bg:"#fce7f3",tx:"#be185d",br:"#f9a8d4"},
+  "Gemini":           {bg:"#dbeafe",tx:"#1d4ed8",br:"#93c5fd"},
+  "ChatGPT":          {bg:"#d1fae5",tx:"#065f46",br:"#6ee7b7"},
+  "Gemini / ChatGPT": {bg:"#fef9c3",tx:"#854d0e",br:"#fde047"}
+};
+var PHASES = [];
+for(var i=0;i<STEPS.length;i++){
+  if(PHASES.indexOf(STEPS[i].phase)===-1) PHASES.push(STEPS[i].phase);
+}
+var TOTAL = STEPS.length;
 
-  <script type="text/babel">
-    const firebaseConfig = {
-      apiKey:            "AIzaSyAwhbOo4kQ_fsOnHTKYvc7ogg1YO2CGqwA",
-      authDomain:        "checklist-8598f.firebaseapp.com",
-      projectId:         "checklist-8598f",
-      storageBucket:     "checklist-8598f.firebasestorage.app",
-      messagingSenderId: "336930799163",
-      appId:             "1:336930799163:web:775f3b715e8ea1317ba61e",
-    };
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+var S = {
+  videos: [{id:1,name:"Видео 1",checked:{}},{id:2,name:"Видео 2",checked:{}},{id:3,name:"Видео 3",checked:{}}],
+  activeId: 1,
+  editingId: null,
+  showOverview: false,
+  syncLabel: "💾 локально",
+  user: null,
+  fbReady: false,
+  firstLoad: true
+};
 
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db   = firebase.firestore();
+// ═══════════════════════════════════════════════════════
+//  ЛОКАЛЬНОЕ ХРАНЕНИЕ
+// ═══════════════════════════════════════════════════════
+function loadLocal(){
+  try{
+    var d = localStorage.getItem("checklist_v2");
+    if(d){ var p=JSON.parse(d); if(p&&p.length) S.videos=p; }
+  }catch(e){}
+}
+function saveLocal(vids){
+  try{ localStorage.setItem("checklist_v2", JSON.stringify(vids)); }catch(e){}
+}
+loadLocal();
 
-    const STEPS = [
-      { id: 1,  phase: "📝 Подготовка",   task: "Придумать сценарий",                                       who: "Gemini + Claude" },
-      { id: 2,  phase: "🎬 Производство",  task: "Снять видео",                                              who: "Ты" },
-      { id: 3,  phase: "🎬 Производство",  task: "Смонтировать видео",                                       who: "Ты" },
-      { id: 4,  phase: "📤 Публикация",    task: "Загрузить ролик на YouTube",                               who: "Ты" },
-      { id: 5,  phase: "📤 Публикация",    task: "Выгрузить субтитры через YouTube",                         who: "Ты" },
-      { id: 6,  phase: "📤 Публикация",    task: "Перевести субтитры, название и описание на английский",    who: "Gemini" },
-      { id: 7,  phase: "📤 Публикация",    task: "Описание на русском и английском + заголовки",             who: "Gemini" },
-      { id: 8,  phase: "🎨 Оформление",   task: "Сделать обложку для YouTube",                              who: "ChatGPT" },
-      { id: 9,  phase: "📣 Продвижение",  task: "Написать пост в Сообщество YouTube",                       who: "Gemini / ChatGPT" },
-      { id: 10, phase: "📣 Продвижение",  task: "Выложить пост в Telegram с ссылкой на YouTube",            who: "ChatGPT" },
-      { id: 11, phase: "📣 Продвижение",  task: "Сделать фото / обложку для Telegram",                      who: "ChatGPT" },
-    ];
+// ═══════════════════════════════════════════════════════
+//  FIREBASE (загружаем динамически)
+// ═══════════════════════════════════════════════════════
+var db=null, auth=null, fbUnsub=null, saveTimer=null;
 
-    const WHO_COLORS = {
-      "Gemini + Claude":  { bg:"#ede9fe", text:"#6d28d9", border:"#c4b5fd" },
-      "Ты":               { bg:"#fce7f3", text:"#be185d", border:"#f9a8d4" },
-      "Gemini":           { bg:"#dbeafe", text:"#1d4ed8", border:"#93c5fd" },
-      "ChatGPT":          { bg:"#d1fae5", text:"#065f46", border:"#6ee7b7" },
-      "Gemini / ChatGPT": { bg:"#fef9c3", text:"#854d0e", border:"#fde047" },
-    };
+function loadScript(src, cb){
+  var s=document.createElement("script");
+  s.src=src;
+  s.onload=cb;
+  s.onerror=function(){ cb(new Error("fail")); };
+  document.head.appendChild(s);
+}
 
-    const phases = [...new Set(STEPS.map(s => s.phase))];
-    const defaultVideos = [
-      { id: 1, name: "Видео 1", checked: {} },
-      { id: 2, name: "Видео 2", checked: {} },
-      { id: 3, name: "Видео 3", checked: {} },
-    ];
-
-    function App() {
-      const [user,      setUser]      = React.useState(null);
-      const [loading,   setLoading]   = React.useState(true);
-      const isFirstLoad = React.useRef(true);
-      const [videos,    setVideos]    = React.useState(defaultVideos);
-      const [activeId,  setActiveId]  = React.useState(1);
-      const [editingId, setEditingId] = React.useState(null);
-      const [syncLabel, setSyncLabel] = React.useState("");
-      const saveTimer = React.useRef(null);
-
-      React.useEffect(() => auth.onAuthStateChanged(u => { setUser(u); setLoading(false); }), []);
-
-      React.useEffect(() => {
-        if (!user) return;
-        isFirstLoad.current = true;
-        return db.collection("users").doc(user.uid).onSnapshot(snap => {
-          if (snap.exists && snap.data().videos?.length) {
-            const v = snap.data().videos;
-            setVideos(v);
-            if (isFirstLoad.current) {
-              setActiveId(v[0].id);
-              isFirstLoad.current = false;
+function initFirebase(){
+  loadScript("https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js", function(e1){
+    if(e1){ setSyncLabel("только локально"); return; }
+    loadScript("https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js", function(e2){
+      if(e2){ setSyncLabel("только локально"); return; }
+      loadScript("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js", function(e3){
+        if(e3){ setSyncLabel("только локально"); return; }
+        try{
+          firebase.initializeApp({
+            apiKey:"AIzaSyAwhbOo4kQ_fsOnHTKYvc7ogg1YO2CGqwA",
+            authDomain:"checklist-8598f.firebaseapp.com",
+            projectId:"checklist-8598f",
+            storageBucket:"checklist-8598f.firebasestorage.app",
+            messagingSenderId:"336930799163",
+            appId:"1:336930799163:web:775f3b715e8ea1317ba61e"
+          });
+          auth=firebase.auth();
+          db=firebase.firestore();
+          S.fbReady=true;
+          auth.onAuthStateChanged(function(u){
+            S.user=u;
+            S.firstLoad=true;
+            if(fbUnsub){ fbUnsub(); fbUnsub=null; }
+            if(u){
+              setSyncLabel("подключаю...");
+              fbUnsub=db.collection("users").doc(u.uid).onSnapshot(function(snap){
+                if(snap.exists && snap.data().videos && snap.data().videos.length){
+                  var v=snap.data().videos;
+                  S.videos=v;
+                  if(S.firstLoad){ S.activeId=v[0].id; S.firstLoad=false; }
+                }
+                setSyncLabel("✓ сохранено");
+                render();
+              }, function(){ setSyncLabel("⚠ ошибка"); });
+            } else {
+              setSyncLabel("не вошла");
+              render();
             }
-          }
-        });
-      }, [user]);
+          });
+        }catch(err){ setSyncLabel("только локально"); }
+      });
+    });
+  });
+}
 
-      const saveToFirebase = (nv) => {
-        if (!user) return;
-        clearTimeout(saveTimer.current);
-        setSyncLabel("сохраняю...");
-        saveTimer.current = setTimeout(() => {
-          db.collection("users").doc(user.uid).set({ videos: nv }, { merge: true })
-            .then(() => setSyncLabel("✓ сохранено"))
-            .catch(() => setSyncLabel("⚠ ошибка"));
-        }, 600);
-      };
+function setSyncLabel(t){ S.syncLabel=t; }
 
-      const updateVideos = (nv) => { setVideos(nv); saveToFirebase(nv); };
-      const updateVideo  = (id, patch) => updateVideos(videos.map(v => v.id === id ? { ...v, ...patch } : v));
-      const active       = videos.find(v => v.id === activeId);
-      const toggle       = (sid) => updateVideo(activeId, { checked: { ...active.checked, [sid]: !active.checked[sid] } });
-      const resetVideo   = () => updateVideo(activeId, { checked: {} });
-      const addVideo     = () => { const id = Date.now(); updateVideos([...videos, { id, name: `Видео ${videos.length + 1}`, checked: {} }]); setActiveId(id); setEditingId(id); };
-      const deleteVideo  = (id) => { const r = videos.filter(v => v.id !== id); updateVideos(r); if (activeId === id) setActiveId(r[0]?.id); };
-      const login        = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-      const logout       = () => auth.signOut();
+function saveToFirebase(vids){
+  if(!db||!S.user) return;
+  clearTimeout(saveTimer);
+  setSyncLabel("сохраняю...");
+  saveTimer=setTimeout(function(){
+    db.collection("users").doc(S.user.uid).set({videos:vids},{merge:true})
+      .then(function(){ setSyncLabel("✓ сохранено"); render(); })
+      .catch(function(){ setSyncLabel("⚠ ошибка"); render(); });
+  },600);
+}
 
-      const done  = active ? Object.values(active.checked).filter(Boolean).length : 0;
-      const total = STEPS.length;
-      const pct   = Math.round((done / total) * 100);
+// ═══════════════════════════════════════════════════════
+//  ACTIONS
+// ═══════════════════════════════════════════════════════
+function save(vids){
+  S.videos=vids;
+  saveLocal(vids);
+  saveToFirebase(vids);
+  render();
+}
+function updateVideo(id,patch){
+  save(S.videos.map(function(v){ return v.id===id?Object.assign({},v,patch):v; }));
+}
+function toggle(sid){
+  var active=getActive();
+  var c=Object.assign({},active.checked);
+  c[sid]=!c[sid];
+  updateVideo(S.activeId,{checked:c});
+}
+function resetVideo(){ updateVideo(S.activeId,{checked:{}}); }
+function addVideo(){
+  var id=Date.now();
+  save(S.videos.concat([{id:id,name:"Видео "+(S.videos.length+1),checked:{}}]));
+  S.activeId=id; S.editingId=id; S.showOverview=false;
+  render();
+}
+function deleteVideo(id){
+  var r=S.videos.filter(function(v){ return v.id!==id; });
+  save(r);
+  if(S.activeId===id&&r.length){ S.activeId=r[0].id; }
+  render();
+}
+function login(){ if(auth) auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+function logout(){ if(auth) auth.signOut().then(function(){ S.user=null; render(); }); }
+function getActive(){ return S.videos.filter(function(v){ return v.id===S.activeId; })[0]; }
 
-      if (loading) return (
-        <div style={{ minHeight:"100vh", background:"#f5f0e8", display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <p style={{ color:"#9a8878", fontStyle:"italic", fontSize:18 }}>загружаю...</p>
-        </div>
-      );
+// ═══════════════════════════════════════════════════════
+//  RENDER HELPERS
+// ═══════════════════════════════════════════════════════
+function div(style){ var el=document.createElement("div"); css(el,style); return el; }
+function span(txt,style){ var el=document.createElement("span"); el.textContent=txt||""; if(style)css(el,style); return el; }
+function p(txt,style){ var el=document.createElement("p"); el.textContent=txt||""; if(style)css(el,style); return el; }
+function h1(txt,style){ var el=document.createElement("h1"); el.textContent=txt||""; if(style)css(el,style); return el; }
+function btn(txt,style,cb){ var el=document.createElement("button"); el.textContent=txt||""; if(style)css(el,style); el.addEventListener("click",cb); return el; }
+function img(src,style){ var el=document.createElement("img"); el.src=src||""; if(style)css(el,style); return el; }
+function inp(val,style){ var el=document.createElement("input"); el.value=val||""; if(style)css(el,style); return el; }
+function add(parent){ for(var i=1;i<arguments.length;i++) if(arguments[i]) parent.appendChild(arguments[i]); return parent; }
+function css(el,s){
+  var map={
+    flexDirection:"flex-direction",alignItems:"align-items",justifyContent:"justify-content",
+    flexShrink:"flex-shrink",flexWrap:"flex-wrap",overflowX:"overflow-x",
+    borderBottom:"border-bottom",borderRadius:"border-radius",borderTop:"border-top",
+    fontSize:"font-size",fontWeight:"font-weight",fontStyle:"font-style",fontFamily:"font-family",
+    textAlign:"text-align",textTransform:"text-transform",textDecoration:"text-decoration",
+    letterSpacing:"letter-spacing",lineHeight:"line-height",
+    marginBottom:"margin-bottom",marginTop:"margin-top",marginLeft:"margin-left",marginRight:"margin-right",
+    paddingBottom:"padding-bottom",paddingTop:"padding-top",paddingLeft:"padding-left",paddingRight:"padding-right",
+    maxWidth:"max-width",minHeight:"min-height",
+    boxShadow:"box-shadow",whiteSpace:"white-space",overflowX:"overflow-x",overflow:"overflow",
+    textOverflow:"text-overflow",WebkitOverflowScrolling:"-webkit-overflow-scrolling",
+    background:"background",color:"color",border:"border",cursor:"cursor",
+    display:"display",width:"width",height:"height",
+    flex:"flex",gap:"gap",padding:"padding",margin:"margin"
+  };
+  Object.keys(s).forEach(function(k){
+    var prop=map[k]||k;
+    var val=s[k];
+    if(val!==undefined&&val!==null) el.style.setProperty(prop,String(val));
+  });
+}
 
-      if (!user) return (
-        <div style={{ minHeight:"100vh", background:"#f5f0e8", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:24, padding:32 }}>
-          <p style={{ color:"#9a8878", fontSize:13, letterSpacing:3, textTransform:"uppercase" }}>мой канал</p>
-          <h1 style={{ color:"#2a2420", fontSize:32, fontWeight:"normal", fontStyle:"italic", textAlign:"center", lineHeight:1.3 }}>
-            Чек-лист<br/>выпуска ролика
-          </h1>
-          <button onClick={login} style={{
-            marginTop:8, background:"#8b5e3c", border:"none",
-            color:"#fff", padding:"16px 36px", borderRadius:14,
-            cursor:"pointer", fontSize:18, fontFamily:"Georgia,serif",
-            boxShadow:"0 2px 16px rgba(139,94,60,0.3)",
-          }}>
-            🔑 Войти через Google
-          </button>
-        </div>
-      );
+// ═══════════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════════
+function render(){
+  var root=document.getElementById("root");
+  while(root.firstChild) root.removeChild(root.firstChild);
+  root.appendChild(buildScreen());
+}
 
-      return (
-        <div style={{ minHeight:"100vh", background:"#f5f0e8" }}>
+function buildScreen(){
+  var wrap=div({minHeight:"100vh",background:"#f5f0e8"});
 
-          {/* Шапка */}
-          <div style={{
-            display:"flex", alignItems:"center", justifyContent:"space-between",
-            padding:"10px 18px", borderBottom:"1px solid #e5ddd0",
-            background:"#fffdf8",
-          }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <img src={user.photoURL} alt="" style={{ width:30, height:30, borderRadius:"50%" }} />
-              <span style={{ color:"#9a8878", fontSize:15 }}>{user.displayName?.split(" ")[0]}</span>
-              <span style={{ color:"#a0b090", fontSize:12 }}>{syncLabel}</span>
-            </div>
-            <button onClick={logout} style={{
-              background:"transparent", border:"1px solid #e5ddd0",
-              color:"#9a8878", cursor:"pointer", fontSize:14,
-              fontFamily:"inherit", padding:"5px 14px", borderRadius:8,
-            }}>выйти</button>
-          </div>
+  // ── Шапка ──
+  var hdr=div({display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 18px",borderBottom:"1px solid #e5ddd0",background:"#fffdf8"});
+  var left=div({display:"flex",alignItems:"center",gap:"10px"});
+  if(S.user&&S.user.photoURL) add(left,img(S.user.photoURL,{width:"30px",height:"30px",borderRadius:"50%"}));
+  var name=S.user?S.user.displayName?S.user.displayName.split(" ")[0]:"":"";
+  add(left,span(name,{color:"#9a8878",fontSize:"14px"}));
+  add(left,span(S.syncLabel,{color:"#a0b090",fontSize:"11px"}));
+  add(hdr,left);
+  if(S.fbReady&&!S.user){
+    add(hdr,btn("🔑 Войти",{background:"#8b5e3c",border:"none",color:"#fff",padding:"7px 16px",borderRadius:"8px",fontSize:"14px"},login));
+  } else if(S.user){
+    add(hdr,btn("выйти",{background:"transparent",border:"1px solid #e5ddd0",color:"#9a8878",padding:"5px 14px",borderRadius:"8px",fontSize:"13px"},logout));
+  }
+  add(wrap,hdr);
 
-          {/* Вкладки */}
-          <div style={{
-            display:"flex", alignItems:"center", overflowX:"auto",
-            borderBottom:"1px solid #e5ddd0", padding:"0 18px", gap:0,
-            background:"#fffdf8",
-          }}>
-            {videos.map(v => {
-              const vDone    = Object.values(v.checked).filter(Boolean).length;
-              const isActive = v.id === activeId;
-              return (
-                <div key={v.id} onClick={() => { setActiveId(v.id); setEditingId(null); }}
-                  style={{
-                    display:"flex", alignItems:"center", gap:8,
-                    padding:"14px 18px 12px", cursor:"pointer", flexShrink:0,
-                    borderBottom: isActive ? "3px solid #8b5e3c" : "3px solid transparent",
-                    transition:"all 0.15s",
-                  }}>
-                  {editingId === v.id ? (
-                    <input autoFocus value={v.name}
-                      onClick={e => e.stopPropagation()}
-                      onChange={e => updateVideo(v.id, { name: e.target.value })}
-                      onBlur={() => setEditingId(null)}
-                      onKeyDown={e => e.key === "Enter" && setEditingId(null)}
-                      style={{
-                        background:"transparent", border:"none",
-                        borderBottom:"1px solid #8b5e3c", color:"#2a2420",
-                        fontFamily:"inherit", fontSize:16, width:130,
-                      }} />
-                  ) : (
-                    <span onDoubleClick={e => { e.stopPropagation(); setEditingId(v.id); }}
-                      style={{
-                        fontSize:16, fontWeight: isActive ? "bold" : "normal",
-                        color: isActive ? "#8b5e3c" : "#9a8878",
-                        maxWidth:150, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
-                      }}>
-                      {v.name}
-                    </span>
-                  )}
-                  <span style={{
-                    fontSize:12, flexShrink:0,
-                    color: vDone === total ? "#4a7c59" : "#9a8878",
-                    background: vDone === total ? "#d1fae5" : "#ede8e0",
-                    padding:"2px 8px", borderRadius:20,
-                  }}>
-                    {vDone === total ? "✓" : `${vDone}/${total}`}
-                  </span>
-                  {videos.length > 1 && isActive && (
-                    <span onClick={e => { e.stopPropagation(); deleteVideo(v.id); }}
-                      style={{ color:"#c0b0a0", fontSize:14, cursor:"pointer" }}>✕</span>
-                  )}
-                </div>
-              );
-            })}
-            <div onClick={addVideo} style={{
-              padding:"14px 18px 12px", cursor:"pointer", color:"#9a8878",
-              fontSize:24, flexShrink:0, borderBottom:"3px solid transparent",
-            }}>+</div>
-          </div>
+  // ── Вкладки ──
+  var tabs=div({display:"flex",alignItems:"center",overflowX:"auto",borderBottom:"1px solid #e5ddd0",background:"#fffdf8",padding:"0 18px"});
+  tabs.className="scrollx";
 
-          {/* Контент */}
-          {active && (
-            <div style={{ maxWidth:620, margin:"0 auto", padding:"28px 18px 60px" }}>
+  // Обзор
+  var ovActive=S.showOverview;
+  var ovTab=div({display:"flex",alignItems:"center",padding:"14px 14px 12px",cursor:"pointer",flexShrink:"0",borderBottom:ovActive?"3px solid #c4956a":"3px solid transparent"});
+  ovTab.appendChild(span("📋 Обзор",{fontSize:"15px",color:ovActive?"#c4956a":"#9a8878",fontWeight:ovActive?"bold":"normal",whiteSpace:"nowrap"}));
+  ovTab.addEventListener("click",function(){ S.showOverview=true; S.editingId=null; render(); });
+  add(tabs,ovTab);
 
-              <div style={{ marginBottom:24 }}>
-                <p style={{ color:"#9a8878", fontSize:12, letterSpacing:3, textTransform:"uppercase", marginBottom:8 }}>мой канал</p>
-                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                  <h1 style={{ fontSize:30, fontWeight:"normal", fontStyle:"italic", color:"#6b4423", cursor:"text" }}
-                    onDoubleClick={() => setEditingId(active.id)}>
-                    {active.name}
-                  </h1>
-                  <span onClick={() => setEditingId(active.id)} style={{ color:"#c0a888", fontSize:18, cursor:"pointer" }}>✎</span>
-                </div>
-                <p style={{ color:"#9a8878", fontSize:15, marginTop:8 }}>{done} из {total} шагов выполнено</p>
-              </div>
+  // Разделитель
+  var sep=div({width:"1px",height:"20px",background:"#e5ddd0",flexShrink:"0",margin:"0 6px"});
+  add(tabs,sep);
 
-              {/* Прогресс */}
-              <div style={{ height:6, background:"#e5ddd0", borderRadius:3, marginBottom:32, overflow:"hidden" }}>
-                <div style={{
-                  height:"100%", width:`${pct}%`,
-                  background:"linear-gradient(90deg, #c4956a, #e8a87c)",
-                  borderRadius:3, transition:"width 0.4s ease",
-                }} />
-              </div>
+  // Видео-вкладки
+  S.videos.forEach(function(v){
+    var vDone=0;
+    STEPS.forEach(function(s){ if(v.checked[s.id]) vDone++; });
+    var isAct=!S.showOverview&&v.id===S.activeId;
+    var tab=div({display:"flex",alignItems:"center",gap:"7px",padding:"14px 14px 12px",cursor:"pointer",flexShrink:"0",borderBottom:isAct?"3px solid #8b5e3c":"3px solid transparent"});
+    tab.addEventListener("click",function(){ S.activeId=v.id; S.showOverview=false; S.editingId=null; render(); });
 
-              {phases.map(phase => (
-                <div key={phase} style={{ marginBottom:28 }}>
-                  <p style={{ fontSize:12, letterSpacing:2, textTransform:"uppercase", color:"#9a8878", marginBottom:12, paddingLeft:4 }}>
-                    {phase}
-                  </p>
-                  {STEPS.filter(s => s.phase === phase).map(step => {
-                    const isDone = !!active.checked[step.id];
-                    const wc = WHO_COLORS[step.who] || { bg:"#f3f4f6", text:"#374151", border:"#d1d5db" };
-                    return (
-                      <div key={step.id} onClick={() => toggle(step.id)} style={{
-                        display:"flex", alignItems:"center", gap:14,
-                        padding:"16px 16px", marginBottom:10, borderRadius:14,
-                        background: isDone ? "#ede8e0" : "#fffdf8",
-                        border:`1px solid ${isDone ? "#d5ccc0" : "#e5ddd0"}`,
-                        cursor:"pointer", transition:"all 0.2s",
-                        boxShadow: isDone ? "none" : "0 1px 6px rgba(0,0,0,0.04)",
-                      }}>
-                        <div style={{
-                          width:26, height:26, borderRadius:8, flexShrink:0,
-                          border:`2px solid ${isDone ? "#8b5e3c" : "#c4a882"}`,
-                          background: isDone ? "#8b5e3c" : "transparent",
-                          display:"flex", alignItems:"center", justifyContent:"center",
-                          transition:"all 0.2s",
-                        }}>
-                          {isDone && (
-                            <svg width="13" height="11" viewBox="0 0 13 11" fill="none">
-                              <path d="M1 5.5L5 9.5L12 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          )}
-                        </div>
-                        <p style={{
-                          flex:1, margin:0, fontSize:16, lineHeight:1.5,
-                          color: isDone ? "#b8a898" : "#2a2420",
-                          textDecoration: isDone ? "line-through" : "none",
-                        }}>{step.task}</p>
-                        <span style={{
-                          fontSize:13, padding:"4px 11px", borderRadius:20,
-                          background: wc.bg, color: wc.text,
-                          border:`1px solid ${wc.border}`,
-                          whiteSpace:"nowrap", flexShrink:0, fontFamily:"sans-serif",
-                        }}>{step.who}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-
-              {done === total && (
-                <div style={{
-                  textAlign:"center", padding:32, background:"#fffbf0",
-                  borderRadius:18, border:"1px solid #f0d080", marginTop:8,
-                }}>
-                  <p style={{ fontSize:36, marginBottom:10 }}>🎉</p>
-                  <p style={{ color:"#8b6914", fontStyle:"italic", fontSize:20 }}>Ролик выпущен! Умница.</p>
-                </div>
-              )}
-
-              <button onClick={resetVideo} style={{
-                marginTop:28, background:"transparent",
-                border:"1px solid #e5ddd0", color:"#9a8878",
-                padding:"12px 20px", borderRadius:12,
-                cursor:"pointer", fontSize:15, display:"block",
-                width:"100%", fontFamily:"inherit",
-              }}>сбросить чек-лист этого видео</button>
-            </div>
-          )}
-        </div>
-      );
+    if(S.editingId===v.id){
+      var field=inp(v.name,{background:"transparent",border:"none",borderBottom:"1px solid #8b5e3c",color:"#2a2420",fontSize:"15px",width:"120px"});
+      field.addEventListener("click",function(e){ e.stopPropagation(); });
+      field.addEventListener("input",function(){ updateVideo(v.id,{name:field.value}); });
+      field.addEventListener("blur",function(){ S.editingId=null; render(); });
+      field.addEventListener("keydown",function(e){ if(e.key==="Enter"){ S.editingId=null; render(); } });
+      add(tab,field);
+      setTimeout(function(){ field.focus(); },50);
+    } else {
+      var lbl=span(v.name,{fontSize:"15px",color:isAct?"#8b5e3c":"#9a8878",fontWeight:isAct?"bold":"normal",maxWidth:"140px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"});
+      lbl.addEventListener("dblclick",function(e){ e.stopPropagation(); S.editingId=v.id; render(); });
+      add(tab,lbl);
     }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-  </script>
+    var badge=span(vDone===TOTAL?"✓":(vDone+"/"+TOTAL),{fontSize:"11px",color:vDone===TOTAL?"#4a7c59":"#9a8878",background:vDone===TOTAL?"#d1fae5":"#ede8e0",padding:"2px 7px",borderRadius:"20px",flexShrink:"0"});
+    add(tab,badge);
+
+    if(S.videos.length>1&&isAct){
+      var x=span("✕",{color:"#c0b0a0",fontSize:"13px",cursor:"pointer"});
+      x.addEventListener("click",function(e){ e.stopPropagation(); deleteVideo(v.id); });
+      add(tab,x);
+    }
+    add(tabs,tab);
+  });
+
+  var addTab=div({display:"flex",alignItems:"center",padding:"14px 14px 12px",cursor:"pointer",flexShrink:"0",borderBottom:"3px solid transparent",fontSize:"22px",color:"#9a8878"});
+  addTab.textContent="+";
+  addTab.addEventListener("click",addVideo);
+  add(tabs,addTab);
+  add(wrap,tabs);
+
+  // ── Контент ──
+  var content=div({maxWidth:"620px",margin:"0 auto",padding:"24px 18px 60px"});
+
+  if(S.showOverview){
+    buildOverview(content);
+  } else {
+    buildChecklist(content);
+  }
+
+  add(wrap,content);
+  return wrap;
+}
+
+function buildOverview(content){
+  var overview=[];
+  for(var i=0;i<STEPS.length;i++){
+    var step=STEPS[i];
+    var pending=S.videos.filter(function(v){ return !v.checked[step.id]; });
+    if(pending.length>0) overview.push({step:step,pending:pending});
+  }
+
+  add(content,p("мой канал",{color:"#9a8878",fontSize:"12px",letterSpacing:"3px",textTransform:"uppercase",marginBottom:"8px"}));
+  add(content,h1("Что ещё не сделано",{fontSize:"26px",fontWeight:"normal",fontStyle:"italic",color:"#6b4423",marginBottom:"6px"}));
+  var total=0; overview.forEach(function(x){ total+=x.pending.length; });
+  add(content,p(total+" задач осталось",{color:"#9a8878",fontSize:"14px",marginBottom:"24px"}));
+
+  if(overview.length===0){
+    var fin=div({textAlign:"center",padding:"36px",background:"#fffbf0",borderRadius:"18px",border:"1px solid #f0d080"});
+    add(fin,p("🎉",{fontSize:"34px",marginBottom:"8px"}));
+    add(fin,p("Всё сделано! Умница.",{color:"#8b6914",fontStyle:"italic",fontSize:"18px"}));
+    add(content,fin);
+    return;
+  }
+
+  overview.forEach(function(item){
+    var wc=WHO[item.step.who]||{bg:"#f3f4f6",tx:"#374151",br:"#d1d5db"};
+    var block=div({marginBottom:"20px"});
+
+    var taskRow=div({display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"});
+    var badge=span(item.step.who,{fontSize:"11px",padding:"3px 9px",borderRadius:"20px",background:wc.bg,color:wc.tx,border:"1px solid "+wc.br,whiteSpace:"nowrap",flexShrink:"0"});
+    var taskText=p(item.step.task,{fontSize:"14px",color:"#6b4423",fontWeight:"bold",margin:"0",lineHeight:"1.3"});
+    add(taskRow,badge,taskText);
+    add(block,taskRow);
+
+    item.pending.forEach(function(v){
+      var card=div({display:"flex",alignItems:"center",gap:"12px",padding:"13px 16px",marginBottom:"6px",borderRadius:"12px",background:"#fffdf8",border:"1px solid #e5ddd0",cursor:"pointer"});
+      var checkbox=div({width:"20px",height:"20px",borderRadius:"6px",flexShrink:"0",border:"2px solid #c4a882",background:"transparent"});
+      var name=p(v.name,{margin:"0",fontSize:"16px",color:"#2a2420",flex:"1"});
+      var arrow=span("→",{color:"#c4a882",fontSize:"18px"});
+      add(card,checkbox,name,arrow);
+      (function(vid){ card.addEventListener("click",function(){ S.activeId=vid.id; S.showOverview=false; render(); }); })(v);
+      add(block,card);
+    });
+    add(content,block);
+  });
+}
+
+function buildChecklist(content){
+  var active=getActive();
+  if(!active) return;
+
+  var done=0;
+  STEPS.forEach(function(s){ if(active.checked[s.id]) done++; });
+  var pct=Math.round((done/TOTAL)*100);
+
+  add(content,p("мой канал",{color:"#9a8878",fontSize:"12px",letterSpacing:"3px",textTransform:"uppercase",marginBottom:"8px"}));
+
+  var titleRow=div({display:"flex",alignItems:"center",gap:"10px",marginBottom:"6px"});
+  var title=h1(active.name,{fontSize:"26px",fontWeight:"normal",fontStyle:"italic",color:"#6b4423",cursor:"text"});
+  title.addEventListener("dblclick",function(){ S.editingId=active.id; render(); });
+  var pencil=span("✎",{color:"#c0a888",fontSize:"18px",cursor:"pointer"});
+  pencil.addEventListener("click",function(){ S.editingId=active.id; render(); });
+  add(titleRow,title,pencil);
+  add(content,titleRow);
+  add(content,p(done+" из "+TOTAL+" шагов выполнено",{color:"#9a8878",fontSize:"14px",marginBottom:"22px"}));
+
+  // Прогресс
+  var pbWrap=div({height:"6px",background:"#e5ddd0",borderRadius:"3px",marginBottom:"28px",overflow:"hidden"});
+  var pbFill=div({height:"100%",background:"linear-gradient(90deg,#c4956a,#e8a87c)",borderRadius:"3px",width:pct+"%"});
+  add(pbWrap,pbFill);
+  add(content,pbWrap);
+
+  // Шаги
+  PHASES.forEach(function(phase){
+    var sec=div({marginBottom:"24px"});
+    var secLabel=p(phase,{fontSize:"11px",letterSpacing:"2px",textTransform:"uppercase",color:"#9a8878",marginBottom:"10px",paddingLeft:"4px"});
+    add(sec,secLabel);
+
+    STEPS.filter(function(s){ return s.phase===phase; }).forEach(function(step){
+      var isDone=!!active.checked[step.id];
+      var wc=WHO[step.who]||{bg:"#f3f4f6",tx:"#374151",br:"#d1d5db"};
+
+      var card=div({display:"flex",alignItems:"center",gap:"14px",padding:"15px 14px",marginBottom:"9px",borderRadius:"14px",cursor:"pointer",background:isDone?"#ede8e0":"#fffdf8",border:"1px solid "+(isDone?"#d5ccc0":"#e5ddd0")});
+      if(!isDone) card.style.setProperty("box-shadow","0 1px 5px rgba(0,0,0,0.05)");
+
+      // Чекбокс
+      var cb=div({width:"26px",height:"26px",borderRadius:"8px",flexShrink:"0",border:"2px solid "+(isDone?"#8b5e3c":"#c4a882"),background:isDone?"#8b5e3c":"transparent",display:"flex",alignItems:"center",justifyContent:"center"});
+      if(isDone){
+        var svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+        svg.setAttribute("width","13"); svg.setAttribute("height","11"); svg.setAttribute("viewBox","0 0 13 11"); svg.setAttribute("fill","none");
+        var pt=document.createElementNS("http://www.w3.org/2000/svg","path");
+        pt.setAttribute("d","M1 5.5L5 9.5L12 1"); pt.setAttribute("stroke","white"); pt.setAttribute("stroke-width","2.2"); pt.setAttribute("stroke-linecap","round"); pt.setAttribute("stroke-linejoin","round");
+        svg.appendChild(pt); cb.appendChild(svg);
+      }
+      add(card,cb);
+
+      var taskText=p(step.task,{flex:"1",margin:"0",fontSize:"16px",lineHeight:"1.5",color:isDone?"#b8a898":"#2a2420",textDecoration:isDone?"line-through":"none"});
+      add(card,taskText);
+
+      var who=span(step.who,{fontSize:"12px",padding:"4px 10px",borderRadius:"20px",background:wc.bg,color:wc.tx,border:"1px solid "+wc.br,whiteSpace:"nowrap",flexShrink:"0"});
+      add(card,who);
+
+      (function(sid){ card.addEventListener("click",function(){ toggle(sid); }); })(step.id);
+      add(sec,card);
+    });
+    add(content,sec);
+  });
+
+  if(done===TOTAL){
+    var fin=div({textAlign:"center",padding:"28px",background:"#fffbf0",borderRadius:"18px",border:"1px solid #f0d080",marginTop:"8px"});
+    add(fin,p("🎉",{fontSize:"34px",marginBottom:"8px"}));
+    add(fin,p("Ролик выпущен! Умница.",{color:"#8b6914",fontStyle:"italic",fontSize:"18px"}));
+    add(content,fin);
+  }
+
+  var rstBtn=btn("сбросить чек-лист этого видео",{marginTop:"24px",background:"transparent",border:"1px solid #e5ddd0",color:"#9a8878",padding:"12px 20px",borderRadius:"12px",fontSize:"14px",display:"block",width:"100%"},resetVideo);
+  add(content,rstBtn);
+}
+
+// ── Старт ──
+render();
+initFirebase();
+</script>
 </body>
 </html>
