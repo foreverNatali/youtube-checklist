@@ -274,13 +274,27 @@ function buildScreen(){
     if(S.editingId===v.id){
       var field=inp(v.name,{background:"transparent",border:"none",borderBottom:"1px solid #8b5e3c",color:"#2a2420",fontSize:"15px",width:"120px"});
       field.addEventListener("click",function(e){ e.stopPropagation(); });
-      field.addEventListener("input",function(){ updateVideo(v.id,{name:field.value}); });
-      field.addEventListener("blur",function(){ S.editingId=null; render(); });
-      field.addEventListener("keydown",function(e){ if(e.key==="Enter"){ S.editingId=null; render(); } });
+      field.addEventListener("input",function(){
+        // только обновляем данные, без перерисовки
+        S.videos = S.videos.map(function(v2){ return v2.id===v.id ? Object.assign({},v2,{name:field.value}) : v2; });
+        saveLocal(S.videos);
+        // обновляем текст в вкладке без полного ре-рендера
+        var tabLabel = document.getElementById("tablabel-"+v.id);
+        if(tabLabel) tabLabel.textContent = field.value || " ";
+      });
+      field.addEventListener("blur",function(){
+        saveToFirebase(S.videos);
+        S.editingId=null; render();
+      });
+      field.addEventListener("keydown",function(e){ if(e.key==="Enter"){
+        saveToFirebase(S.videos);
+        S.editingId=null; render();
+      } });
       add(tab,field);
       setTimeout(function(){ field.focus(); },50);
     } else {
       var lbl=span(v.name,{fontSize:"15px",color:isAct?"#8b5e3c":"#9a8878",fontWeight:isAct?"bold":"normal",maxWidth:"140px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"});
+      lbl.id = "tablabel-"+v.id;
       lbl.addEventListener("dblclick",function(e){ e.stopPropagation(); S.editingId=v.id; render(); });
       add(tab,lbl);
     }
