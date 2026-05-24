@@ -91,17 +91,6 @@
         db = firebase.firestore();
         handlers.onReady();
 
-        // AWAIT redirect result BEFORE setting up onAuthStateChanged.
-        // Without await, onAuthStateChanged fires first (user=null) → shows login →
-        // redirect hasn't been processed yet → loop!
-        try {
-          await auth.getRedirectResult();
-        } catch (err) {
-          if (err && err.code !== 'auth/no-auth-event') {
-            console.error('getRedirectResult error:', err.code);
-          }
-        }
-
         auth.onAuthStateChanged(u => {
           if (fbUnsub) { fbUnsub(); fbUnsub = null; }
           hasPulledOnce = false;
@@ -164,8 +153,14 @@
 
       const login = () => {
         if (!auth) { setSyncLabel('⚠ Firebase не загрузился'); return; }
-        auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider())
-          .catch((err) => { console.error(err); setSyncLabel('⚠ ' + (err?.message || 'не удалось войти')); });
+        // signInWithPopup works on iOS too — Firebase uses SFSafariViewController automatically
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).catch(err => {
+          if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+            console.error('login error:', err.code, err.message);
+            setSyncLabel('⚠ ' + (err?.message || 'не удалось войти'));
+          }
+        });
       };
       const logout = () => { if (auth) auth.signOut(); };
 

@@ -10,6 +10,7 @@ const DEFAULT_STEPS = [
   { id: 6,  phase: 'Публикация',   task: 'Перевести субтитры и описание на английский',         who: 'Gemini' },
   { id: 7,  phase: 'Публикация',   task: 'Описание на русском и английском + заголовки',        who: 'Gemini' },
   { id: 8,  phase: 'Оформление',   task: 'Сделать обложку для YouTube',                         who: 'ChatGPT' },
+  { id: 14, phase: 'Оформление',   task: 'Сделать обложку на английском языке',                who: 'ChatGPT' },
   { id: 9,  phase: 'Продвижение',  task: 'Написать пост в Сообщество YouTube',                  who: 'Gemini / ChatGPT' },
   { id: 10, phase: 'Продвижение',  task: 'Выложить пост в Telegram со ссылкой',                 who: 'ChatGPT' },
   { id: 11, phase: 'Продвижение',  task: 'Сделать обложку для Telegram',                        who: 'ChatGPT' },
