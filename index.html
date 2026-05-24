@@ -91,14 +91,15 @@
         db = firebase.firestore();
         handlers.onReady();
 
-        // Handle redirect result (user coming back after mobile sign-in redirect)
-        auth.getRedirectResult().then(result => {
-          // onAuthStateChanged will fire automatically — nothing extra needed
-        }).catch(err => {
-          if (err && err.code !== 'auth/no-auth-event' && err.code !== 'auth/cancelled-popup-request') {
-            console.error('redirect result error:', err.code, err.message);
-          }
-        });
+        // Handle redirect result ONLY if we initiated a redirect (flag prevents loop)
+        if (sessionStorage.getItem('fb_auth_pending')) {
+          sessionStorage.removeItem('fb_auth_pending');
+          auth.getRedirectResult().catch(err => {
+            if (err && err.code !== 'auth/no-auth-event') {
+              console.error('redirect result error:', err.code);
+            }
+          });
+        }
 
         auth.onAuthStateChanged(u => {
           if (fbUnsub) { fbUnsub(); fbUnsub = null; }
@@ -164,18 +165,16 @@
         saveToFirebase(state, setSyncLabel);
       }, []);
 
-      // iOS Safari blocks popups when user gesture is lost through async/await.
-      // Detect iOS and use redirect directly; desktop gets popup.
       const login = () => {
         if (!auth) { setSyncLabel('⚠ Firebase не загрузился'); return; }
         const provider = new firebase.auth.GoogleAuthProvider();
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        if (isIOS) {
-          // Redirect flow for iOS — page reloads after Google auth
+        const isIOSPWA = window.navigator.standalone === true;
+        if (isIOSPWA) {
+          // iOS PWA: use redirect but set a flag so we don't loop
+          sessionStorage.setItem('fb_auth_pending', '1');
           auth.signInWithRedirect(provider);
         } else {
-          // Popup flow for desktop
+          // Browser (desktop + iOS Safari): popup works fine
           auth.signInWithPopup(provider).catch(err => {
             console.error('login error:', err?.code, err?.message);
             setSyncLabel('⚠ ' + (err?.message || 'не удалось войти'));
