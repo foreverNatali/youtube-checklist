@@ -3,9 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
   <title>Мой канал · Чек-лист</title>
   <meta name="theme-color" content="#f5f0e8" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -42,10 +39,10 @@
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
-  <!-- App modules — version query forces Safari to refetch on each release -->
-  <script type="text/babel" src="app-data.jsx?v=20260524d"></script>
-  <script type="text/babel" src="app-sheets.jsx?v=20260524d"></script>
-  <script type="text/babel" src="app.jsx?v=20260524d"></script>
+  <!-- App modules -->
+  <script type="text/babel" src="app-data.jsx"></script>
+  <script type="text/babel" src="app-sheets.jsx"></script>
+  <script type="text/babel" src="app.jsx"></script>
 
   <!-- Sync layer + bootstrap -->
   <script type="text/babel">
@@ -105,7 +102,7 @@
         // Persist auth across PWA / Safari sessions on iOS
         try { await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
         // Complete redirect sign-in if we just came back from Google
-        try { await auth.getRedirectResult(); } catch (e) { console.warn('redirect result', e); }
+        try { await auth.getRedirectResult(); } catch (e) {}
         handlers.onReady();
         auth.onAuthStateChanged(u => {
           if (fbUnsub) { fbUnsub(); fbUnsub = null; }
@@ -125,13 +122,11 @@
               handlers.onSync('✓ сохранено');
             }, () => handlers.onSync('⚠ ошибка'));
           } else {
-            handlers.onSync('не вошёл');
+            handlers.onSync('локально');
           }
         });
       } catch (e) {
-        console.error('Firebase init failed', e);
-        handlers.onError(e?.message || 'не удалось загрузить Firebase');
-        handlers.onSync('⚠ нет связи');
+        handlers.onSync('локально (нет связи)');
       }
     }
 
@@ -152,10 +147,9 @@
     // ─────────────────────────────────────────────────────────────
     function Root() {
       const [bootState, setBootState] = React.useState(() => loadLocal());
-      const [syncLabel, setSyncLabel] = React.useState('загружаю…');
+      const [syncLabel, setSyncLabel] = React.useState('локально');
       const [user, setUser] = React.useState(null);
       const [fbReady, setFbReady] = React.useState(false);
-      const [fbError, setFbError] = React.useState(null);
       // Used to force-remount App when a remote snapshot arrives (so it
       // re-seeds activeId etc from the new state).
       const [seedKey, setSeedKey] = React.useState(0);
@@ -165,7 +159,6 @@
           onReady: () => setFbReady(true),
           onUser: (u) => setUser(u),
           onSync: (l) => setSyncLabel(l),
-          onError: (msg) => setFbError(msg),
           onRemote: (remote) => { setBootState(remote); setSeedKey(k => k + 1); },
         });
       }, []);
@@ -176,11 +169,7 @@
       }, []);
 
       const login = () => {
-        if (!auth) {
-          setSyncLabel('⚠ Firebase не загрузился — обнови страницу');
-          return;
-        }
-        setSyncLabel('открываю Google…');
+        if (!auth) return;
         const provider = new firebase.auth.GoogleAuthProvider();
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
           || window.matchMedia('(display-mode: standalone)').matches
@@ -188,21 +177,14 @@
         if (isMobile) {
           // iOS Safari / PWA: popups are blocked. Redirect goes through Google
           // and returns via getRedirectResult() on next load.
-          auth.signInWithRedirect(provider).catch((err) => {
-            console.error(err);
-            setSyncLabel('⚠ ' + (err?.message || 'не удалось войти'));
-          });
+          auth.signInWithRedirect(provider).catch(() => setSyncLabel('⚠ не удалось войти'));
         } else {
           auth.signInWithPopup(provider).catch((err) => {
             // Some browsers block popup — fall back to redirect.
             if (err && (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user' || err.code === 'auth/operation-not-supported-in-this-environment')) {
-              auth.signInWithRedirect(provider).catch((e2) => {
-                console.error(e2);
-                setSyncLabel('⚠ ' + (e2?.message || 'не удалось войти'));
-              });
+              auth.signInWithRedirect(provider).catch(() => setSyncLabel('⚠ не удалось войти'));
             } else {
-              console.error(err);
-              setSyncLabel('⚠ ' + (err?.message || 'не удалось войти'));
+              setSyncLabel('⚠ не удалось войти');
             }
           });
         }
@@ -219,7 +201,6 @@
           onLogin={login}
           onLogout={logout}
           fbReady={fbReady}
-          fbError={fbError}
         />
       );
     }

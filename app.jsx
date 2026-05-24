@@ -2,7 +2,7 @@
 // Persistence (localStorage + optional Firebase) is plumbed in via the
 // onPersist callback supplied by index.html.
 
-function App({ initialState, onPersist, syncLabel, user, onLogin, onLogout, fbReady, fbError }) {
+function App({ initialState, onPersist, syncLabel, user, onLogin, onLogout, fbReady }) {
   // ── State ──────────────────────────────────────────
   const [state, setState] = React.useState(initialState);
   const [activeId, setActiveId] = React.useState(() => {
@@ -159,26 +159,19 @@ function App({ initialState, onPersist, syncLabel, user, onLogin, onLogout, fbRe
         </div>
       </div>
 
-      {/* Prominent sign-in banner — shown when not signed in. Always rendered
-          (independent of fbReady) so user has a visible CTA even if Firebase
-          is slow or failed. Login handler shows an error if it can't proceed. */}
-      {!user && (
+      {/* Prominent sign-in banner — shown when not signed in. Easy to miss
+          the tiny link on mobile, so we surface it once with context. */}
+      {fbReady && !user && (
         <div style={appStyles.signInBanner}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#6b4423', marginBottom: 2 }}>
               Войди чтобы видеть свои видео
             </div>
             <div style={{ fontSize: 11.5, color: '#8b7256', lineHeight: 1.35 }}>
-              {fbError
-                ? `Ошибка: ${fbError}. Попробуй обновить страницу.`
-                : fbReady
-                  ? 'Данные на компьютере и телефоне синхронизируются через Google аккаунт'
-                  : 'Подключаюсь к серверу…'}
+              Данные на компьютере и телефоне синхронизируются через твой Google аккаунт
             </div>
           </div>
-          <button style={appStyles.signInBtn} onClick={onLogin} disabled={!!fbError}>
-            {fbError ? 'Ошибка' : 'Войти'}
-          </button>
+          <button style={appStyles.signInBtn} onClick={onLogin}>Войти</button>
         </div>
       )}
 
