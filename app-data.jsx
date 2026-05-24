@@ -94,7 +94,13 @@ function appMigrate(raw) {
   if (raw && typeof raw === 'object') {
     const base = appInitialState();
     return {
-      steps: Array.isArray(raw.steps) && raw.steps.length ? raw.steps : base.steps,
+      steps: (() => {
+        const saved = Array.isArray(raw.steps) && raw.steps.length ? raw.steps : base.steps;
+        // Merge: add any new DEFAULT_STEPS missing from saved data
+        const savedIds = new Set(saved.map(s => s.id));
+        const added = DEFAULT_STEPS.filter(s => !savedIds.has(s.id));
+        return [...saved, ...added];
+      })(),
       whoPalette: raw.whoPalette && Object.keys(raw.whoPalette).length ? { ...base.whoPalette, ...raw.whoPalette } : base.whoPalette,
       phases: Array.isArray(raw.phases) && raw.phases.length ? raw.phases : base.phases,
       videos: Array.isArray(raw.videos) && raw.videos.length
