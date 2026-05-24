@@ -73,6 +73,7 @@
 
     // ─── Firebase (lazy-loaded — same project as before) ───
     let db = null, auth = null, fbUnsub = null, saveTimer = null;
+    let hasPulledOnce = false; // don't push local state until we've pulled cloud
     let setReactBridge = null; // set from inside App via React state hooks below
 
     function loadScript(src) {
@@ -98,9 +99,14 @@
         });
         auth = firebase.auth();
         db = firebase.firestore();
+        // Persist auth across PWA / Safari sessions on iOS
+        try { await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
+        // Complete redirect sign-in if we just came back from Google
+        try { await auth.getRedirectResult(); } catch (e) {}
         handlers.onReady();
         auth.onAuthStateChanged(u => {
           if (fbUnsub) { fbUnsub(); fbUnsub = null; }
+          hasPulledOnce = false; // gate pushes until we've pulled fresh cloud
           handlers.onUser(u);
           if (u) {
             handlers.onSync('подключаю…');
@@ -112,6 +118,7 @@
                   handlers.onRemote(appMigrate(remote));
                 }
               }
+              hasPulledOnce = true; // safe to push from now on
               handlers.onSync('✓ сохранено');
             }, () => handlers.onSync('⚠ ошибка'));
           } else {
@@ -125,6 +132,7 @@
 
     function saveToFirebase(state, onSync) {
       if (!db || !auth?.currentUser) return;
+      if (!hasPulledOnce) return; // wait until we've pulled cloud first
       clearTimeout(saveTimer);
       onSync('сохраняю…');
       saveTimer = setTimeout(() => {
@@ -162,8 +170,24 @@
 
       const login = () => {
         if (!auth) return;
-        auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
-          .catch(() => setSyncLabel('⚠ не удалось войти'));
+        const provider = new firebase.auth.GoogleAuthProvider();
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+          || window.matchMedia('(display-mode: standalone)').matches
+          || window.navigator.standalone;
+        if (isMobile) {
+          // iOS Safari / PWA: popups are blocked. Redirect goes through Google
+          // and returns via getRedirectResult() on next load.
+          auth.signInWithRedirect(provider).catch(() => setSyncLabel('⚠ не удалось войти'));
+        } else {
+          auth.signInWithPopup(provider).catch((err) => {
+            // Some browsers block popup — fall back to redirect.
+            if (err && (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user' || err.code === 'auth/operation-not-supported-in-this-environment')) {
+              auth.signInWithRedirect(provider).catch(() => setSyncLabel('⚠ не удалось войти'));
+            } else {
+              setSyncLabel('⚠ не удалось войти');
+            }
+          });
+        }
       };
       const logout = () => { if (auth) auth.signOut(); };
 

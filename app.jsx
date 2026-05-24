@@ -151,9 +151,6 @@ function App({ initialState, onPersist, syncLabel, user, onLogin, onLogout, fbRe
         </div>
         <div style={appStyles.syncLine}>
           <SyncDot label={syncLabel} />
-          {fbReady && !user && (
-            <button style={appStyles.linkBtn} onClick={onLogin}>Войти для синхро</button>
-          )}
           {user && (
             <button style={appStyles.linkBtn} onClick={onLogout}>
               {user.displayName ? user.displayName.split(' ')[0] : 'вы'} · выйти
@@ -161,6 +158,22 @@ function App({ initialState, onPersist, syncLabel, user, onLogin, onLogout, fbRe
           )}
         </div>
       </div>
+
+      {/* Prominent sign-in banner — shown when not signed in. Easy to miss
+          the tiny link on mobile, so we surface it once with context. */}
+      {fbReady && !user && (
+        <div style={appStyles.signInBanner}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#6b4423', marginBottom: 2 }}>
+              Войди чтобы видеть свои видео
+            </div>
+            <div style={{ fontSize: 11.5, color: '#8b7256', lineHeight: 1.35 }}>
+              Данные на компьютере и телефоне синхронизируются через твой Google аккаунт
+            </div>
+          </div>
+          <button style={appStyles.signInBtn} onClick={onLogin}>Войти</button>
+        </div>
+      )}
 
       {/* ── Carousel ── */}
       {liveVideos.length === 0 ? (
@@ -412,6 +425,16 @@ const appStyles = {
     background: 'transparent', border: 'none', color: '#8b5e3c',
     fontSize: 12, fontFamily: 'inherit', fontWeight: 600, cursor: 'pointer',
     padding: 0,
+  },
+  signInBanner: {
+    display: 'flex', alignItems: 'center', gap: 12,
+    margin: '4px 20px 0', padding: '12px 14px',
+    background: '#fff7e8', border: '1px solid #e8c890', borderRadius: 14,
+  },
+  signInBtn: {
+    background: '#8b5e3c', color: '#fffdf8', border: 'none', borderRadius: 10,
+    padding: '10px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+    fontFamily: 'inherit', flexShrink: 0,
   },
 
   empty: { textAlign: 'center', padding: '60px 20px' },
