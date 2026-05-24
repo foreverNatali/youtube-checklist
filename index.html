@@ -91,12 +91,16 @@
         db = firebase.firestore();
         handlers.onReady();
 
-        // Handle return from Google redirect (must be called on every page load)
-        auth.getRedirectResult().catch(err => {
+        // AWAIT redirect result BEFORE setting up onAuthStateChanged.
+        // Without await, onAuthStateChanged fires first (user=null) → shows login →
+        // redirect hasn't been processed yet → loop!
+        try {
+          await auth.getRedirectResult();
+        } catch (err) {
           if (err && err.code !== 'auth/no-auth-event') {
             console.error('getRedirectResult error:', err.code);
           }
-        });
+        }
 
         auth.onAuthStateChanged(u => {
           if (fbUnsub) { fbUnsub(); fbUnsub = null; }
