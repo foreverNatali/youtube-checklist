@@ -2,941 +2,167 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, user-scalable=no" />
-  <meta name="theme-color" content="#c4956a" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <title>Мой канал · Чек-лист</title>
+  <meta name="theme-color" content="#f5f0e8" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Канал" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
-  <title>Мой канал · Чек-лист</title>
-
-  <!-- Firebase scripts loaded DIRECTLY (not dynamically) — same as wishlist that works on iOS -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
   <style>
-    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%}
     body{
       background:#f5f0e8;color:#2a2420;
-      font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif;
+      font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI','Helvetica Neue',Arial,sans-serif;
+      -webkit-tap-highlight-color:transparent;
       -webkit-font-smoothing:antialiased;
       overscroll-behavior-y:contain;
       padding-top:env(safe-area-inset-top);
       padding-bottom:env(safe-area-inset-bottom);
     }
-    button,input{font-family:inherit;-webkit-appearance:none;appearance:none}
-    ::-webkit-scrollbar{display:none}
-
-    /* Loading */
-    #loading{
-      display:flex;align-items:center;justify-content:center;height:100vh;
-      font-size:14px;color:#9a8878;font-style:italic;
+    #root{min-height:100%;max-width:480px;margin:0 auto;background:#f5f0e8}
+    @media (min-width: 600px){
+      body{ background:#e8dfd0; }
+      #root{ box-shadow:0 0 60px rgba(0,0,0,0.08); }
     }
-
-    /* Login screen */
-    #loginScreen{
-      display:none;position:fixed;inset:0;z-index:200;
-      background:linear-gradient(135deg,#fef3e0,#f5e8d8,#ede0c8);
-      align-items:center;justify-content:center;flex-direction:column;
-      padding:24px;
-    }
-    .lcrd{
-      background:#fffdf8;border:1px solid #ece2d2;border-radius:24px;
-      padding:40px 28px;max-width:360px;width:100%;text-align:center;
-      box-shadow:0 8px 40px rgba(139,94,60,.15);
-    }
-    .llogo{font-size:48px;margin-bottom:12px}
-    .ltitle{font-size:26px;font-weight:800;color:#2a2420;margin-bottom:6px;letter-spacing:-0.5px}
-    .ldesc{font-size:13px;color:#7a6048;line-height:1.6;margin-bottom:24px}
-    .gbtn{
-      display:flex;align-items:center;justify-content:center;gap:12px;
-      width:100%;padding:14px 20px;background:#fff;border:1.5px solid #e8d0c0;
-      border-radius:12px;font-size:15px;font-weight:600;color:#2a2420;cursor:pointer;
-      transition:all .2s;
-    }
-    .gbtn:hover{border-color:#c4956a;box-shadow:0 4px 16px rgba(196,149,106,.2)}
-    .lerr{margin-top:14px;font-size:12px;color:#b8326b;padding:0 8px}
-
     @keyframes sheetFadeIn{from{opacity:0}to{opacity:1}}
     @keyframes sheetSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    ::-webkit-scrollbar{display:none}
+    button{font-family:inherit}
+    input,button{-webkit-appearance:none;appearance:none}
   </style>
 </head>
 <body>
+  <div id="root" style="padding:40px;text-align:center;color:#9a8878;font-style:italic">загружаю…</div>
 
-<div id="loading">загружаю…</div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
-<!-- Login screen — separate from main app -->
-<div id="loginScreen">
-  <div class="lcrd">
-    <div class="llogo">🎬</div>
-    <h1 class="ltitle">Мой канал</h1>
-    <p class="ldesc">Чек-лист для YouTube роликов.<br>Синхронизация на компьютере и телефоне.</p>
-    <button class="gbtn" onclick="signInGoogle()">
-      <svg width="18" height="18" viewBox="0 0 18 18"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
-      Войти через Google
-    </button>
-    <div class="lerr" id="lerr"></div>
-  </div>
-</div>
+  <script type="text/babel" src="app-data.jsx"></script>
+  <script type="text/babel" src="app-sheets.jsx"></script>
+  <script type="text/babel" src="app.jsx"></script>
 
-<div id="root"></div>
+  <script type="text/babel">
+    const LS_KEY = 'checklist_v3';
+    const LEGACY_KEY = 'checklist_v2';
 
-<script>
-// ═══════════════════════════════════════════════════════
-// FIREBASE — same project as before
-// ═══════════════════════════════════════════════════════
-firebase.initializeApp({
-  apiKey:"AIzaSyAwhbOo4kQ_fsOnHTKYvc7ogg1YO2CGqwA",
-  authDomain:"checklist-8598f.firebaseapp.com",
-  projectId:"checklist-8598f",
-  storageBucket:"checklist-8598f.firebasestorage.app",
-  messagingSenderId:"336930799163",
-  appId:"1:336930799163:web:775f3b715e8ea1317ba61e"
-});
-var auth = firebase.auth();
-var db   = firebase.firestore();
-var currentUser = null;
-var fbUnsub = null;
-
-// Direct, synchronous popup call — no awaits/state changes before it,
-// otherwise iOS Safari blocks the window (loses the user-gesture token).
-function signInGoogle(){
-  var p = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(p).catch(function(e){
-    if(e && e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request'){
-      var el = document.getElementById('lerr');
-      if(el) el.textContent = 'Ошибка: ' + (e.message || e.code);
-    }
-  });
-}
-function doLogout(){ auth.signOut(); }
-
-// Auth state — shows login screen OR app
-auth.onAuthStateChanged(function(user){
-  document.getElementById('loading').style.display = 'none';
-  if(user){
-    currentUser = user;
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('root').style.display = 'block';
-    if(fbUnsub){ fbUnsub(); fbUnsub = null; }
-    bootApp(user);
-  } else {
-    currentUser = null;
-    if(fbUnsub){ fbUnsub(); fbUnsub = null; }
-    document.getElementById('loginScreen').style.display = 'flex';
-    document.getElementById('root').style.display = 'none';
-  }
-});
-
-// bootApp is defined later in the React script. We need to wait for it.
-var __appReady = null;
-function bootApp(user){
-  if(typeof __appReady === 'function') __appReady(user);
-  else setTimeout(function(){ bootApp(user); }, 50);
-}
-</script>
-
-<!-- React + Babel for the app UI. Login screen above does NOT use React,
-     so it shows instantly without waiting for Babel to compile. -->
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-
-<script type="text/babel">
-// ═══════════════════════════════════════════════════════
-// DATA MODEL
-// ═══════════════════════════════════════════════════════
-const DEFAULT_STEPS = [
-  { id: 1,  phase: 'Подготовка',   task: 'Придумать сценарий',                                  who: 'Gemini + Claude' },
-  { id: 2,  phase: 'Производство', task: 'Снять видео',                                         who: 'Ты' },
-  { id: 3,  phase: 'Производство', task: 'Смонтировать видео',                                  who: 'Ты' },
-  { id: 12, phase: 'Производство', task: 'Нарезать шортс',                                      who: 'Ты' },
-  { id: 13, phase: 'Производство', task: 'Озвучить на английском (дубляж)',                     who: 'Ты' },
-  { id: 4,  phase: 'Публикация',   task: 'Загрузить ролик на YouTube',                          who: 'Ты' },
-  { id: 5,  phase: 'Публикация',   task: 'Выгрузить субтитры через YouTube',                    who: 'Ты' },
-  { id: 6,  phase: 'Публикация',   task: 'Перевести субтитры и описание на английский',         who: 'Gemini' },
-  { id: 7,  phase: 'Публикация',   task: 'Описание на русском и английском + заголовки',        who: 'Gemini' },
-  { id: 8,  phase: 'Оформление',   task: 'Сделать обложку для YouTube',                         who: 'ChatGPT' },
-  { id: 9,  phase: 'Продвижение',  task: 'Написать пост в Сообщество YouTube',                  who: 'Gemini / ChatGPT' },
-  { id: 10, phase: 'Продвижение',  task: 'Выложить пост в Telegram со ссылкой',                 who: 'ChatGPT' },
-  { id: 11, phase: 'Продвижение',  task: 'Сделать обложку для Telegram',                        who: 'ChatGPT' },
-];
-const DEFAULT_PHASES = ['Подготовка', 'Производство', 'Публикация', 'Оформление', 'Продвижение'];
-const DEFAULT_WHO = {
-  'Ты':               { bg: '#fce7f0', tx: '#b8326b', dot: '#e8579a' },
-  'Gemini':           { bg: '#dde9ff', tx: '#2a5fc8', dot: '#5b8ef0' },
-  'ChatGPT':          { bg: '#d6f1e0', tx: '#1f7050', dot: '#3aa978' },
-  'Gemini + Claude':  { bg: '#efeaff', tx: '#6d4ed9', dot: '#8b6cf2' },
-  'Gemini / ChatGPT': { bg: '#fbf0c3', tx: '#9b6914', dot: '#d4a93a' },
-};
-const COLOR_POOL = [
-  { bg: '#e0e9ff', tx: '#3b4d99', dot: '#6b85d6' },
-  { bg: '#ffe2e7', tx: '#a83454', dot: '#e36a85' },
-  { bg: '#dff2d9', tx: '#3d7530', dot: '#7ab560' },
-  { bg: '#fff0d6', tx: '#a06420', dot: '#d99540' },
-  { bg: '#e6e1f5', tx: '#5c4a99', dot: '#8b78c4' },
-  { bg: '#dcefef', tx: '#266866', dot: '#4ea4a0' },
-  { bg: '#f3e0ef', tx: '#8c3877', dot: '#c168a9' },
-];
-function nextColor(palette) {
-  const used = new Set(Object.values(palette).map(p => p.dot));
-  for (const c of COLOR_POOL) if (!used.has(c.dot)) return c;
-  return COLOR_POOL[Object.keys(palette).length % COLOR_POOL.length];
-}
-
-const PHASE_GLYPH = {
-  'Подготовка':   () => <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 11l8.5-8.5 1.5 1.5L3.5 12.5 1.5 13l.5-2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>,
-  'Производство': () => <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="3.5" width="9" height="7" rx="1" stroke="currentColor" strokeWidth="1.4"/><path d="M10.5 6.5l2.5-1.5v4l-2.5-1.5" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>,
-  'Публикация':   () => <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1.5v8M4 4.5l3-3 3 3M2.5 11.5h9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  'Оформление':   () => <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.4"/><circle cx="4.8" cy="5.5" r="0.9" fill="currentColor"/><circle cx="9.2" cy="5.5" r="0.9" fill="currentColor"/><circle cx="9.5" cy="9" r="0.9" fill="currentColor"/></svg>,
-  'Продвижение':  () => <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 5v4l5 2.5V2.5L2 5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M9 4v6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M11 6c.7.3 1 .8 1 1s-.3.7-1 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
-};
-
-function initialState(){
-  return {
-    steps: DEFAULT_STEPS.map(s => ({...s})),
-    phases: [...DEFAULT_PHASES],
-    whoPalette: {...DEFAULT_WHO},
-    videos: [{ id: Date.now(), name: 'Видео 1', deadline: null, archived: false, checked: {}, createdAt: Date.now() }],
-  };
-}
-
-function migrate(raw){
-  if(!raw || typeof raw !== 'object') return initialState();
-  const base = initialState();
-  return {
-    steps: Array.isArray(raw.steps) && raw.steps.length ? raw.steps : base.steps,
-    phases: Array.isArray(raw.phases) && raw.phases.length ? raw.phases : base.phases,
-    whoPalette: raw.whoPalette && typeof raw.whoPalette === 'object'
-      ? Object.assign({}, base.whoPalette, raw.whoPalette)
-      : base.whoPalette,
-    videos: Array.isArray(raw.videos) && raw.videos.length
-      ? raw.videos.map(v => Object.assign({archived:false}, v))
-      : base.videos,
-  };
-}
-
-function progress(video, steps){
-  let done = 0;
-  for(const s of steps) if(video.checked[s.id]) done++;
-  return { done, total: steps.length, pct: steps.length ? Math.round(done/steps.length*100) : 0 };
-}
-function nextTask(video, steps){
-  for(const s of steps) if(!video.checked[s.id]) return s;
-  return null;
-}
-function currentPhase(video, steps){
-  const n = nextTask(video, steps);
-  return n ? n.phase : 'Готово';
-}
-
-// ═══════════════════════════════════════════════════════
-// APP COMPONENT
-// ═══════════════════════════════════════════════════════
-function App({ user, initial }){
-  const [state, setState] = React.useState(() => migrate(initial));
-  const [activeId, setActiveId] = React.useState(() => {
-    const live = state.videos.filter(v => !v.archived);
-    return live.length ? live[0].id : (state.videos[0] && state.videos[0].id);
-  });
-  const [view, setView] = React.useState('live'); // 'live' | 'archive'
-  const [whoStepId, setWhoStepId] = React.useState(null);
-  const [videoMenuId, setVideoMenuId] = React.useState(null);
-  const [syncLabel, setSyncLabel] = React.useState('✓ синхронизировано');
-  const scrollerRef = React.useRef(null);
-  const cardRefs = React.useRef({});
-  const skipNextSave = React.useRef(true); // skip the very first save (it's the load)
-  const saveTimer = React.useRef(null);
-
-  // Persist on every change (debounced)
-  React.useEffect(() => {
-    if(skipNextSave.current){ skipNextSave.current = false; return; }
-    if(!currentUser) return;
-    setSyncLabel('сохраняю…');
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      db.collection('users').doc(currentUser.uid).set(state, { merge: false })
-        .then(() => setSyncLabel('✓ сохранено'))
-        .catch((e) => { console.error(e); setSyncLabel('⚠ ошибка'); });
-    }, 600);
-  }, [state]);
-
-  // Carousel scroll detection
-  React.useEffect(() => {
-    const el = scrollerRef.current;
-    if(!el) return;
-    let raf;
-    const onScroll = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const sl = el.scrollLeft + el.clientWidth/2;
-        let best = null, bestDist = Infinity;
-        for(const v of liveVideos){
-          const c = cardRefs.current[v.id];
-          if(!c) continue;
-          const center = c.offsetLeft + c.offsetWidth/2;
-          const d = Math.abs(center - sl);
-          if(d < bestDist){ bestDist = d; best = v.id; }
+    function loadLocal() {
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (raw) return appMigrate(JSON.parse(raw));
+        const legacy = localStorage.getItem(LEGACY_KEY);
+        if (legacy) {
+          const migrated = appMigrate(JSON.parse(legacy));
+          localStorage.setItem(LS_KEY, JSON.stringify(migrated));
+          return migrated;
         }
-        if(best && best !== activeId) setActiveId(best);
+      } catch (e) {}
+      return appInitialState();
+    }
+    function saveLocal(state) { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
+
+    let db = null, auth = null, fbUnsub = null, saveTimer = null, hasPulledOnce = false;
+
+    function loadScript(src) {
+      return new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = src; s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
       });
-    };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  });
-
-  const liveVideos = state.videos.filter(v => !v.archived);
-  const archivedVideos = state.videos.filter(v => v.archived);
-  const active = state.videos.find(v => v.id === activeId);
-
-  // Mutations
-  const updateVideo = (vid, patch) => setState(s => ({ ...s, videos: s.videos.map(v => v.id === vid ? {...v, ...patch} : v) }));
-  const updateVideoFn = (vid, fn) => setState(s => ({ ...s, videos: s.videos.map(v => v.id === vid ? fn(v) : v) }));
-  const updateStep = (sid, patch) => setState(s => ({ ...s, steps: s.steps.map(st => st.id === sid ? {...st, ...patch} : st) }));
-
-  const toggle = (sid) => {
-    if(!active) return;
-    updateVideoFn(active.id, v => ({...v, checked: {...v.checked, [sid]: !v.checked[sid]}}));
-  };
-  const addVideo = () => {
-    const id = Date.now();
-    const newVideo = { id, name: 'Видео ' + (state.videos.filter(v => !v.archived).length + 1), deadline: null, archived: false, checked: {}, createdAt: id };
-    setState(s => ({ ...s, videos: [...s.videos, newVideo] }));
-    setActiveId(id);
-    setTimeout(() => setVideoMenuId(id), 100);
-  };
-  const archiveVideo = (vid) => {
-    updateVideo(vid, { archived: true });
-    if(vid === activeId){
-      const live = state.videos.filter(v => v.id !== vid && !v.archived);
-      if(live.length) setActiveId(live[0].id);
     }
-  };
-  const unarchiveVideo = (vid) => { updateVideo(vid, { archived: false }); setActiveId(vid); setView('live'); };
-  const deleteVideo = (vid) => setState(s => ({ ...s, videos: s.videos.filter(v => v.id !== vid) }));
 
-  const pickWho = (who) => { updateStep(whoStepId, { who }); setWhoStepId(null); };
-  const addPerformer = (name) => {
-    const n = name.trim();
-    if(!n) return;
-    setState(s => {
-      const palette = s.whoPalette[n] ? s.whoPalette : Object.assign({}, s.whoPalette, { [n]: nextColor(s.whoPalette) });
-      return {
-        ...s,
-        whoPalette: palette,
-        steps: s.steps.map(st => st.id === whoStepId ? {...st, who: n} : st),
+    async function initFirebase(handlers) {
+      try {
+        await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js');
+        firebase.initializeApp({
+          apiKey: 'AIzaSyAwhbOo4kQ_fsOnHTKYvc7ogg1YO2CGqwA',
+          authDomain: 'checklist-8598f.firebaseapp.com',
+          projectId: 'checklist-8598f',
+          storageBucket: 'checklist-8598f.firebasestorage.app',
+          messagingSenderId: '336930799163',
+          appId: '1:336930799163:web:775f3b715e8ea1317ba61e',
+        });
+        auth = firebase.auth();
+        db = firebase.firestore();
+        handlers.onReady();
+        auth.onAuthStateChanged(u => {
+          if (fbUnsub) { fbUnsub(); fbUnsub = null; }
+          hasPulledOnce = false;
+          handlers.onUser(u);
+          if (u) {
+            handlers.onSync('подключаю…');
+            fbUnsub = db.collection('users').doc(u.uid).onSnapshot(snap => {
+              if (snap.exists && snap.data()) {
+                const remote = snap.data();
+                if (remote.videos && remote.videos.length) handlers.onRemote(appMigrate(remote));
+              }
+              hasPulledOnce = true;
+              handlers.onSync('✓ сохранено');
+            }, () => handlers.onSync('⚠ ошибка'));
+          } else {
+            handlers.onSync('локально');
+          }
+        });
+      } catch (e) {
+        handlers.onError(e?.message || 'нет связи');
+        handlers.onSync('⚠ нет связи');
+      }
+    }
+
+    function saveToFirebase(state, onSync) {
+      if (!db || !auth?.currentUser || !hasPulledOnce) return;
+      clearTimeout(saveTimer);
+      onSync('сохраняю…');
+      saveTimer = setTimeout(() => {
+        db.collection('users').doc(auth.currentUser.uid).set(state, { merge: true })
+          .then(() => onSync('✓ сохранено'))
+          .catch(() => onSync('⚠ ошибка'));
+      }, 700);
+    }
+
+    function Root() {
+      const [bootState, setBootState] = React.useState(() => loadLocal());
+      const [syncLabel, setSyncLabel] = React.useState('локально');
+      const [user, setUser] = React.useState(null);
+      const [fbReady, setFbReady] = React.useState(false);
+      const [fbError, setFbError] = React.useState(null);
+      const [seedKey, setSeedKey] = React.useState(0);
+
+      React.useEffect(() => {
+        initFirebase({
+          onReady: () => setFbReady(true),
+          onUser: (u) => setUser(u),
+          onSync: (l) => setSyncLabel(l),
+          onError: (msg) => setFbError(msg),
+          onRemote: (remote) => { setBootState(remote); setSeedKey(k => k + 1); },
+        });
+      }, []);
+
+      const persist = React.useCallback((state) => {
+        saveLocal(state);
+        saveToFirebase(state, setSyncLabel);
+      }, []);
+
+      const login = () => {
+        if (!auth) { setSyncLabel('⚠ Firebase не загрузился'); return; }
+        auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+          .catch((err) => { console.error(err); setSyncLabel('⚠ ' + (err?.message || 'не удалось войти')); });
       };
-    });
-    setWhoStepId(null);
-  };
+      const logout = () => { if (auth) auth.signOut(); };
 
-  // ── Render ─────────────────────────────────────────
-  if(view === 'archive'){
-    return (
-      <div style={s.root}>
-        <ArchiveView
-          archived={archivedVideos}
-          steps={state.steps}
-          onBack={() => setView('live')}
-          onUnarchive={unarchiveVideo}
-          onDelete={(vid) => { if(confirm('Удалить навсегда?')) deleteVideo(vid); }}
-        />
-      </div>
-    );
-  }
-
-  const ap = active ? progress(active, state.steps) : { done: 0, total: state.steps.length, pct: 0 };
-  const isAllDone = active && ap.done === ap.total && ap.total > 0;
-
-  return (
-    <div style={s.root}>
-      {/* Top header */}
-      <div style={s.top}>
-        <div style={s.topRow}>
-          <div>
-            <div style={s.eyebrow}>МОЙ КАНАЛ</div>
-            <div style={s.headTitle}>Что снимаем</div>
-          </div>
-          <div style={{display:'flex', gap:8, alignItems:'center'}}>
-            {archivedVideos.length > 0 && (
-              <button style={s.iconBtn} onClick={() => setView('archive')} title="Архив">
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                  <path d="M3 6h14v3H3V6zM4 9v7a1 1 0 001 1h10a1 1 0 001-1V9" stroke="#6b4423" strokeWidth="1.6" strokeLinejoin="round"/>
-                  <path d="M8 12h4" stroke="#6b4423" strokeWidth="1.6" strokeLinecap="round"/>
-                </svg>
-                <span style={s.iconBadge}>{archivedVideos.length}</span>
-              </button>
-            )}
-            <button style={s.iconBtn} onClick={addVideo} title="Новое видео">
-              <span style={{fontSize: 22, lineHeight: 1, paddingBottom: 3}}>＋</span>
-            </button>
-          </div>
-        </div>
-        <div style={s.syncLine}>
-          <SyncDot label={syncLabel} />
-          <button style={s.logoutBtn} onClick={() => doLogout()}>
-            {user.displayName ? user.displayName.split(' ')[0] : 'выйти'} · выйти
-          </button>
-        </div>
-      </div>
-
-      {liveVideos.length === 0 ? (
-        <div style={s.empty}>
-          <div style={{fontSize: 38, marginBottom: 10}}>🎬</div>
-          <div style={{fontSize: 16, color: '#6b4423', fontWeight: 600}}>Нет активных видео</div>
-          <div style={{fontSize: 13, color: '#9a8878', marginTop: 4}}>Нажми ＋ чтобы начать новое</div>
-        </div>
-      ) : (
-        <>
-          <div ref={scrollerRef} style={s.scroller}>
-            <div style={{width: 24, flexShrink: 0}} />
-            {liveVideos.map(v => (
-              <VideoCard
-                key={v.id}
-                v={v}
-                steps={state.steps}
-                palette={state.whoPalette}
-                isActive={v.id === activeId}
-                cardRef={el => (cardRefs.current[v.id] = el)}
-                onTap={() => {
-                  if(v.id === activeId) setVideoMenuId(v.id);
-                  else cardRefs.current[v.id]?.scrollIntoView?.({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                }}
-                onMenu={() => setVideoMenuId(v.id)}
-              />
-            ))}
-            <div style={{width: 24, flexShrink: 0}} />
-          </div>
-          <div style={s.dots}>
-            {liveVideos.map(v => (
-              <div key={v.id} style={{...s.dot, ...(v.id === activeId ? s.dotActive : null)}} />
-            ))}
-          </div>
-        </>
-      )}
-
-      {active && (
-        <div style={s.checklist}>
-          {isAllDone ? (
-            <div style={s.doneBlock}>
-              <div style={{fontSize: 44, marginBottom: 8}}>🎉</div>
-              <div style={{fontSize: 19, fontWeight: 700, color: '#6b4423', marginBottom: 4}}>Ролик выпущен!</div>
-              <div style={{fontSize: 13, color: '#9a8878', marginBottom: 16}}>Можешь убрать в архив, чтобы не отсвечивал</div>
-              <button style={s.archiveBigBtn} onClick={() => archiveVideo(active.id)}>
-                🗄 Убрать в архив
-              </button>
-            </div>
-          ) : (
-            state.phases.map(phase => {
-              const inPhase = state.steps.filter(st => st.phase === phase);
-              if(inPhase.length === 0) return null;
-              const doneInPhase = inPhase.filter(st => active.checked[st.id]).length;
-              return (
-                <div key={phase} style={{marginBottom: 16}}>
-                  <div style={s.phaseHead}>
-                    <span style={{display:'inline-flex', alignItems:'center', gap:7, color:'#7a6048'}}>
-                      {PHASE_GLYPH[phase] ? PHASE_GLYPH[phase]() : null}
-                      {phase}
-                    </span>
-                    <span style={{color: '#b0a090', fontWeight: 600}}>{doneInPhase}/{inPhase.length}</span>
-                  </div>
-                  {inPhase.map(step => (
-                    <TaskRow
-                      key={step.id}
-                      step={step}
-                      isDone={!!active.checked[step.id]}
-                      palette={state.whoPalette}
-                      onToggle={() => toggle(step.id)}
-                      onPickWho={() => setWhoStepId(step.id)}
-                    />
-                  ))}
-                </div>
-              );
-            })
-          )}
-          <div style={{height: 60}} />
-        </div>
-      )}
-
-      {whoStepId !== null && (
-        <WhoPickerSheet
-          step={state.steps.find(st => st.id === whoStepId)}
-          palette={state.whoPalette}
-          onPick={pickWho}
-          onAddNew={addPerformer}
-          onClose={() => setWhoStepId(null)}
-        />
-      )}
-      {videoMenuId !== null && state.videos.find(v => v.id === videoMenuId) && (
-        <VideoMenuSheet
-          video={state.videos.find(v => v.id === videoMenuId)}
-          onClose={() => setVideoMenuId(null)}
-          onRename={(name) => updateVideo(videoMenuId, { name })}
-          onSetDeadline={(d) => updateVideo(videoMenuId, { deadline: d })}
-          onArchive={() => { archiveVideo(videoMenuId); setVideoMenuId(null); }}
-          onDelete={() => {
-            if(confirm('Удалить видео навсегда?')){ deleteVideo(videoMenuId); setVideoMenuId(null); }
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// SUBCOMPONENTS
-// ═══════════════════════════════════════════════════════
-function VideoCard({ v, steps, palette, isActive, onTap, onMenu, cardRef }){
-  const p = progress(v, steps);
-  const phase = currentPhase(v, steps);
-  const next = nextTask(v, steps);
-  const allDone = p.done === p.total && p.total > 0;
-  return (
-    <div ref={cardRef} onClick={onTap} style={{...s.card, ...(isActive ? s.cardActive : null)}}>
-      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap: 8}}>
-        <div style={s.cardPhase}>{allDone ? 'ГОТОВО' : phase.toUpperCase()}</div>
-        <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
-          {v.deadline && <div style={s.cardDl}>{v.deadline}</div>}
-          {isActive && (
-            <button onClick={(e) => { e.stopPropagation(); onMenu(); }} style={s.menuBtn} title="Меню">
-              <svg width="16" height="4" viewBox="0 0 16 4"><circle cx="2" cy="2" r="1.6" fill="#9a8878"/><circle cx="8" cy="2" r="1.6" fill="#9a8878"/><circle cx="14" cy="2" r="1.6" fill="#9a8878"/></svg>
-            </button>
-          )}
-        </div>
-      </div>
-      <div style={s.cardName}>{v.name}</div>
-      <div style={s.cardBottom}>
-        <ProgressRing pct={p.pct} done={p.done} total={p.total} />
-        <div style={{flex: 1, minWidth: 0}}>
-          {allDone ? (
-            <div style={s.cardNextDone}>Готово к архиву ✓</div>
-          ) : (
-            <>
-              <div style={s.cardNextLabel}>Дальше</div>
-              <div style={s.cardNextTask}>{next?.task}</div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TaskRow({ step, isDone, palette, onToggle, onPickWho }){
-  const who = palette[step.who] || { bg: '#eceae0', tx: '#5a5236', dot: '#9a8868' };
-  return (
-    <div style={{...s.taskRow, ...(isDone ? s.taskRowDone : null)}}>
-      <button onClick={onToggle} style={s.checkBtn} aria-label="отметить">
-        <div style={{...s.checkbox, ...(isDone ? s.checkboxDone : null)}}>
-          {isDone && (
-            <svg width="14" height="11" viewBox="0 0 14 11" fill="none"><path d="M1 5.5L5 9.5L13 1.5" stroke="#fff" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          )}
-        </div>
-      </button>
-      <div onClick={onToggle} style={{flex: 1, minWidth: 0, cursor: 'pointer'}}>
-        <div style={{...s.taskText, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? '#b0a090' : '#2a2420'}}>
-          {step.task}
-        </div>
-      </div>
-      <button onClick={(e) => { e.stopPropagation(); onPickWho(); }} style={{...s.whoChip, background: who.bg, color: who.tx}}>
-        {step.who}
-      </button>
-    </div>
-  );
-}
-
-function ProgressRing({ pct, done, total }){
-  const size = 54;
-  const r = (size - 6) / 2;
-  const C = 2 * Math.PI * r;
-  const off = C * (1 - pct/100);
-  const allDone = done === total && total > 0;
-  return (
-    <div style={{position: 'relative', width: size, height: size, flexShrink: 0}}>
-      <svg width={size} height={size} style={{transform: 'rotate(-90deg)'}}>
-        <circle cx={size/2} cy={size/2} r={r} stroke="#e8dccc" strokeWidth="3" fill="none" />
-        <circle cx={size/2} cy={size/2} r={r}
-          stroke={allDone ? '#3aa978' : '#c4956a'} strokeWidth="3" fill="none"
-          strokeDasharray={C} strokeDashoffset={off} strokeLinecap="round"
-          style={{transition: 'stroke-dashoffset .35s'}} />
-      </svg>
-      <div style={{
-        position: 'absolute', inset: 0, display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-        fontSize: 12.5, fontWeight: 700,
-        color: allDone ? '#3aa978' : '#6b4423',
-      }}>{allDone ? '✓' : `${done}/${total}`}</div>
-    </div>
-  );
-}
-
-function SyncDot({ label }){
-  const isOk = /сохранено|синхронизировано|✓/i.test(label || '');
-  const isErr = /ошибка|⚠/i.test(label || '');
-  const color = isErr ? '#d96655' : isOk ? '#3aa978' : '#c4a882';
-  return (
-    <span style={{display:'inline-flex', alignItems:'center', gap: 6, color: '#9a8878', fontSize: 11.5, fontWeight: 500}}>
-      <span style={{width: 7, height: 7, borderRadius: 4, background: color}} />
-      {label}
-    </span>
-  );
-}
-
-// Sheets
-function SheetWrap({ children, onClose, topInset = 80 }){
-  return (
-    <>
-      <div onClick={onClose} style={{
-        position: 'fixed', inset: 0, background: 'rgba(40,30,20,0.4)', zIndex: 200,
-        animation: 'sheetFadeIn .15s ease-out',
-      }} />
-      <div style={{
-        position: 'fixed', left: 0, right: 0, bottom: 0, top: topInset,
-        background: '#f5f0e8', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-        zIndex: 201, display: 'flex', flexDirection: 'column',
-        boxShadow: '0 -8px 30px rgba(0,0,0,0.18)',
-        animation: 'sheetSlideUp .22s cubic-bezier(.2,.7,.3,1)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}>
-        <div style={{width: 40, height: 4, borderRadius: 2, background: '#d0c0a8', margin: '8px auto 4px', flexShrink: 0}} />
-        {children}
-      </div>
-    </>
-  );
-}
-
-function WhoPickerSheet({ step, palette, onPick, onAddNew, onClose }){
-  const [adding, setAdding] = React.useState(false);
-  const [name, setName] = React.useState('');
-  const names = Object.keys(palette);
-  return (
-    <SheetWrap onClose={onClose} topInset={120}>
-      <div style={{padding: '4px 20px 14px'}}>
-        <div style={s.eyebrow2}>КТО ДЕЛАЕТ</div>
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap: 8}}>
-          <div style={s.sheetTitle}>{step.task}</div>
-          <button style={s.xBtn} onClick={onClose}>✕</button>
-        </div>
-      </div>
-      <div style={{flex: 1, overflow: 'auto', padding: '4px 16px 32px'}}>
-        <div style={{display: 'flex', flexDirection: 'column', gap: 8}}>
-          {names.map(n => {
-            const c = palette[n];
-            const isCurrent = step.who === n;
-            return (
-              <button key={n} onClick={() => onPick(n)} style={{
-                ...s.whoRow,
-                borderColor: isCurrent ? '#8b5e3c' : '#ece2d2',
-                background: isCurrent ? '#fff7e8' : '#fffdf8',
-              }}>
-                <div style={{width: 14, height: 14, borderRadius: 7, background: c.dot, flexShrink: 0}} />
-                <div style={{flex: 1, textAlign: 'left', fontSize: 15.5, fontWeight: 600, color: '#2a2420'}}>{n}</div>
-                {isCurrent && (
-                  <svg width="18" height="14" viewBox="0 0 14 11" fill="none"><path d="M1 5.5L5 9.5L13 1.5" stroke="#8b5e3c" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                )}
-              </button>
-            );
-          })}
-        </div>
-        <div style={{marginTop: 18}}>
-          {adding ? (
-            <div style={s.addBox}>
-              <input autoFocus value={name} onChange={e => setName(e.target.value)}
-                onKeyDown={e => { if(e.key === 'Enter'){ onAddNew(name); } }}
-                placeholder="Например: Монтажёр Саша" style={s.input} />
-              <div style={{display: 'flex', gap: 8, marginTop: 10}}>
-                <button style={{...s.btnFlat, ...s.btnGhost}} onClick={() => { setAdding(false); setName(''); }}>Отмена</button>
-                <button style={{...s.btnFlat, ...s.btnPrimary}} onClick={() => onAddNew(name)}>Добавить</button>
-              </div>
-            </div>
-          ) : (
-            <button style={s.addBtn} onClick={() => setAdding(true)}>＋ Добавить исполнителя</button>
-          )}
-        </div>
-      </div>
-    </SheetWrap>
-  );
-}
-
-function VideoMenuSheet({ video, onClose, onRename, onSetDeadline, onArchive, onDelete }){
-  const [mode, setMode] = React.useState(null);
-  const [val, setVal] = React.useState(video.name);
-  const [dl, setDl] = React.useState(video.deadline || '');
-
-  return (
-    <SheetWrap onClose={onClose} topInset={Math.max(200, window.innerHeight - 380)}>
-      <div style={{padding: '4px 20px 14px'}}>
-        <div style={s.eyebrow2}>ВИДЕО</div>
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap: 8}}>
-          <div style={s.sheetTitle}>{video.name}</div>
-          <button style={s.xBtn} onClick={onClose}>✕</button>
-        </div>
-      </div>
-      <div style={{flex: 1, overflow: 'auto', padding: '4px 16px 32px'}}>
-        {mode === 'rename' ? (
-          <div style={s.addBox}>
-            <div style={s.eyebrowSm}>НАЗВАНИЕ ВИДЕО</div>
-            <input autoFocus value={val} onChange={e => setVal(e.target.value)}
-              onKeyDown={e => { if(e.key === 'Enter'){ onRename(val.trim() || video.name); onClose(); } }}
-              style={s.input} />
-            <div style={{display: 'flex', gap: 8, marginTop: 10}}>
-              <button style={{...s.btnFlat, ...s.btnGhost}} onClick={() => setMode(null)}>Назад</button>
-              <button style={{...s.btnFlat, ...s.btnPrimary}} onClick={() => { onRename(val.trim() || video.name); onClose(); }}>Сохранить</button>
-            </div>
-          </div>
-        ) : mode === 'deadline' ? (
-          <div style={s.addBox}>
-            <div style={s.eyebrowSm}>СРОК ПУБЛИКАЦИИ</div>
-            <input autoFocus value={dl} onChange={e => setDl(e.target.value)}
-              placeholder="например: 28 мая"
-              onKeyDown={e => { if(e.key === 'Enter'){ onSetDeadline(dl.trim() || null); onClose(); } }}
-              style={s.input} />
-            <div style={{display: 'flex', gap: 8, marginTop: 10}}>
-              <button style={{...s.btnFlat, ...s.btnGhost}} onClick={() => setMode(null)}>Назад</button>
-              {video.deadline && (
-                <button style={{...s.btnFlat, ...s.btnGhost}} onClick={() => { onSetDeadline(null); onClose(); }}>Убрать</button>
-              )}
-              <button style={{...s.btnFlat, ...s.btnPrimary}} onClick={() => { onSetDeadline(dl.trim() || null); onClose(); }}>Сохранить</button>
-            </div>
-          </div>
-        ) : (
-          <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
-            <MenuItem icon="✎" label="Переименовать" onClick={() => setMode('rename')} />
-            <MenuItem icon="🗓" label={video.deadline ? `Срок: ${video.deadline}` : 'Указать срок'} onClick={() => setMode('deadline')} />
-            <MenuItem icon="🗄" label="Убрать в архив" onClick={onArchive} />
-            <div style={{height: 1, background: '#e5ddd0', margin: '4px 0'}} />
-            <MenuItem icon="🗑" label="Удалить видео" danger onClick={onDelete} />
-          </div>
-        )}
-      </div>
-    </SheetWrap>
-  );
-}
-
-function MenuItem({ icon, label, danger, onClick }){
-  return (
-    <button onClick={onClick} style={{
-      display: 'flex', alignItems: 'center', gap: 14,
-      padding: '14px 14px', background: '#fffdf8',
-      border: '1px solid #ece2d2', borderRadius: 12,
-      color: danger ? '#b8326b' : '#2a2420',
-      fontSize: 15.5, fontWeight: 500, cursor: 'pointer', textAlign: 'left',
-    }}>
-      <span style={{width: 22, fontSize: 18, display: 'flex', justifyContent: 'center'}}>{icon}</span>
-      <span style={{flex: 1}}>{label}</span>
-    </button>
-  );
-}
-
-function ArchiveView({ archived, steps, onBack, onUnarchive, onDelete }){
-  return (
-    <div style={{paddingBottom: 40}}>
-      <div style={{padding: '8px 20px 14px'}}>
-        <button onClick={onBack} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          background: 'transparent', border: 'none', color: '#8b5e3c',
-          fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: '4px 0', marginBottom: 4,
-        }}>
-          <svg width="9" height="14" viewBox="0 0 9 14" fill="none"><path d="M7 1L1 7l6 6" stroke="#8b5e3c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          К видео
-        </button>
-        <div style={s.eyebrow}>АРХИВ</div>
-        <div style={s.headTitle}>Выпущенные <span style={{color:'#a08868', fontWeight:500}}>{archived.length}</span></div>
-      </div>
-      <div style={{padding: '6px 16px 40px'}}>
-        {archived.length === 0 ? (
-          <div style={{textAlign: 'center', padding: '60px 20px', color: '#9a8878'}}>
-            <div style={{fontSize: 40, marginBottom: 10}}>🗄</div>
-            <div style={{fontSize: 15}}>Архив пуст</div>
-          </div>
-        ) : archived.map(v => {
-          const p = progress(v, steps);
-          return (
-            <div key={v.id} style={{
-              display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', marginBottom: 10,
-              borderRadius: 16, background: '#fffdf8', border: '1px solid #ece2d2',
-            }}>
-              <div style={{flex: 1, minWidth: 0}}>
-                <div style={{fontSize: 17, fontWeight: 700, color: '#2a2420', letterSpacing: -0.2}}>{v.name}</div>
-                <div style={{display: 'flex', alignItems: 'center', gap: 8, marginTop: 4}}>
-                  <span style={{fontSize: 11, fontWeight: 700, color: '#3aa978', background: '#d6f1e0', padding: '2px 7px', borderRadius: 6, letterSpacing: 0.4}}>ВЫПУЩЕНО</span>
-                  <span style={{fontSize: 12, color: '#9a8878'}}>{p.done}/{p.total}</span>
-                </div>
-              </div>
-              <div style={{display:'flex', gap: 6}}>
-                <button onClick={() => onUnarchive(v.id)} style={{
-                  background: '#f0e8d8', border: 'none', borderRadius: 10, padding: '8px 14px',
-                  fontSize: 13, fontWeight: 600, color: '#6b4423', cursor: 'pointer',
-                }}>Вернуть</button>
-                <button onClick={() => onDelete(v.id)} style={{
-                  background: 'transparent', border: '1px solid #ece2d2', borderRadius: 10, padding: '8px 12px',
-                  fontSize: 14, color: '#c0a0a0', cursor: 'pointer',
-                }}>✕</button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// STYLES
-// ═══════════════════════════════════════════════════════
-const s = {
-  root: { background: '#f5f0e8', minHeight: '100vh', color: '#2a2420', position: 'relative' },
-  top: { padding: '8px 20px 6px' },
-  topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
-  eyebrow: { fontSize: 10.5, letterSpacing: 1.8, color: '#9a8878', fontWeight: 700 },
-  eyebrow2: { fontSize: 10.5, letterSpacing: 1.8, color: '#9a8878', fontWeight: 700, marginBottom: 4 },
-  eyebrowSm: { fontSize: 10, letterSpacing: 1.5, color: '#9a8878', fontWeight: 700, marginBottom: 8 },
-  headTitle: { fontSize: 26, fontWeight: 800, color: '#2a2420', letterSpacing: -0.5, marginTop: 4 },
-  sheetTitle: { fontSize: 20, fontWeight: 700, color: '#2a2420', letterSpacing: -0.3, lineHeight: 1.2, flex: 1, minWidth: 0 },
-
-  iconBtn: {
-    position: 'relative', width: 40, height: 40, borderRadius: 20, border: '1px solid #d8c8b0',
-    background: '#fffdf8', color: '#6b4423', cursor: 'pointer',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-  iconBadge: {
-    position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, padding: '0 4px',
-    borderRadius: 8, background: '#8b5e3c', color: '#fffdf8',
-    fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    border: '1.5px solid #f5f0e8',
-  },
-  syncLine: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, minHeight: 18 },
-  logoutBtn: {
-    background: 'transparent', border: 'none', color: '#8b5e3c',
-    fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0,
-  },
-  xBtn: {
-    width: 32, height: 32, borderRadius: 16, border: 'none', background: '#ece2d2',
-    color: '#7a6048', fontSize: 14, cursor: 'pointer', flexShrink: 0,
-  },
-
-  empty: { textAlign: 'center', padding: '60px 20px' },
-
-  scroller: {
-    display: 'flex', gap: 14, overflowX: 'auto', overflowY: 'visible',
-    scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
-    paddingTop: 14, paddingBottom: 8,
-  },
-  card: {
-    flex: '0 0 280px', scrollSnapAlign: 'center', minWidth: 0,
-    background: '#fffdf8', borderRadius: 20, padding: '14px 16px 16px',
-    border: '1px solid #e9ddc8',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-    display: 'flex', flexDirection: 'column', gap: 11,
-    cursor: 'pointer', transition: 'border-color .2s, box-shadow .2s',
-    minHeight: 160,
-  },
-  cardActive: { borderColor: '#c4956a', boxShadow: '0 6px 20px rgba(139,94,60,0.18), 0 0 0 1px #c4956a' },
-  cardPhase: { fontSize: 10, letterSpacing: 1.5, color: '#a08868', fontWeight: 700 },
-  cardDl: { fontSize: 11, color: '#9a8878', fontWeight: 500, padding: '2px 8px', background: '#f0e8d8', borderRadius: 8 },
-  cardName: { fontSize: 19, fontWeight: 700, color: '#2a2420', lineHeight: 1.2, letterSpacing: -0.3 },
-  cardBottom: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 2 },
-  cardNextLabel: { fontSize: 10, letterSpacing: 1, color: '#a08868', fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 },
-  cardNextTask: {
-    fontSize: 13, color: '#5a4838', fontWeight: 500, lineHeight: 1.3,
-    overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-  },
-  cardNextDone: { fontSize: 14, fontWeight: 700, color: '#3aa978' },
-  menuBtn: {
-    background: 'transparent', border: 'none', padding: 6, borderRadius: 6,
-    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: -4,
-  },
-
-  dots: { display: 'flex', justifyContent: 'center', gap: 6, padding: '6px 0 12px' },
-  dot: { width: 6, height: 6, borderRadius: 3, background: '#e0d3bf', transition: 'all .2s' },
-  dotActive: { width: 18, background: '#c4956a' },
-
-  checklist: { padding: '4px 20px 24px', borderTop: '1px solid #ece2d2' },
-  phaseHead: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    fontSize: 11, letterSpacing: 1.5, fontWeight: 700,
-    textTransform: 'uppercase', padding: '14px 4px 8px',
-  },
-  taskRow: {
-    display: 'flex', alignItems: 'center', gap: 10,
-    padding: '12px 12px', marginBottom: 8, borderRadius: 14,
-    background: '#fffdf8', border: '1px solid #ece2d2', minHeight: 56,
-  },
-  taskRowDone: { background: '#f0e8da', borderColor: '#e0d3bf' },
-  checkBtn: { background: 'transparent', border: 'none', padding: 6, cursor: 'pointer', display: 'flex', margin: -2 },
-  checkbox: {
-    width: 26, height: 26, borderRadius: 8, border: '2px solid #c4a882', background: 'transparent', flexShrink: 0,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-  checkboxDone: { background: '#8b5e3c', borderColor: '#8b5e3c' },
-  taskText: { fontSize: 15, lineHeight: 1.35, fontWeight: 500 },
-  whoChip: {
-    fontSize: 10.5, fontWeight: 600, padding: '6px 9px', borderRadius: 12,
-    flexShrink: 0, whiteSpace: 'nowrap', letterSpacing: 0.1,
-    border: 'none', cursor: 'pointer', minHeight: 28,
-  },
-
-  doneBlock: {
-    textAlign: 'center', padding: '32px 20px 28px',
-    background: '#fff7e8', borderRadius: 18, border: '1px solid #e8c890', margin: '12px 0',
-  },
-  archiveBigBtn: {
-    background: '#6b4423', color: '#fffdf8', border: 'none', borderRadius: 12,
-    padding: '12px 22px', fontSize: 15, fontWeight: 600, cursor: 'pointer',
-  },
-
-  whoRow: {
-    display: 'flex', alignItems: 'center', gap: 12,
-    padding: '14px 14px', borderRadius: 14, border: '1.5px solid #ece2d2',
-    background: '#fffdf8', cursor: 'pointer', minHeight: 56,
-  },
-  addBtn: {
-    width: '100%', padding: '14px', borderRadius: 14, background: 'transparent',
-    border: '1.5px dashed #c4a882', color: '#8b5e3c',
-    fontSize: 15, fontWeight: 600, cursor: 'pointer',
-  },
-  addBox: { padding: 14, borderRadius: 14, background: '#fffdf8', border: '1px solid #ece2d2' },
-  input: {
-    width: '100%', padding: '12px 14px', borderRadius: 10,
-    border: '1.5px solid #d0c0a8', background: '#fff',
-    fontSize: 16, color: '#2a2420', outline: 'none',
-  },
-  btnFlat: { flex: 1, padding: '12px', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
-  btnPrimary: { background: '#8b5e3c', color: '#fffdf8' },
-  btnGhost: { background: '#ece2d2', color: '#5a4838' },
-};
-
-// ═══════════════════════════════════════════════════════
-// BOOT — called from non-React script after auth resolves
-// ═══════════════════════════════════════════════════════
-window.__appReady = function(user){
-  document.getElementById('root').style.display = 'block';
-  const root = ReactDOM.createRoot(document.getElementById('root'));
-
-  // Listen to cloud data first, then render with whatever we got
-  let firstRender = false;
-  if(fbUnsub) fbUnsub();
-  fbUnsub = db.collection('users').doc(user.uid).onSnapshot(snap => {
-    const raw = snap.exists ? snap.data() : null;
-    const initial = raw && raw.videos ? raw : null;
-    if(!firstRender){
-      firstRender = true;
-      root.render(<App user={user} initial={initial} />);
+      return (
+        <App key={seedKey} initialState={bootState} onPersist={persist}
+          syncLabel={syncLabel} user={user} onLogin={login} onLogout={logout}
+          fbReady={fbReady} fbError={fbError} />
+      );
     }
-    // We don't re-render on subsequent snapshots because the user is actively editing.
-    // (Cross-device sync still happens via initial load on next session.)
-  }, (err) => {
-    console.error(err);
-    if(!firstRender){
-      firstRender = true;
-      root.render(<App user={user} initial={null} />);
-    }
-  });
-};
-</script>
 
+    ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+  </script>
 </body>
 </html>
