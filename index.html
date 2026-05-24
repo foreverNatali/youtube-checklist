@@ -1,453 +1,187 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
   <title>Мой канал · Чек-лист</title>
-  <meta name="theme-color" content="#f5f0e8"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
-  <meta name="apple-mobile-web-app-title" content="Чек-лист"/>
-  <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
+  <meta name="theme-color" content="#f5f0e8" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Канал" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:#f5f0e8;color:#2a2420;font-family:Georgia,serif;-webkit-tap-highlight-color:transparent}
-    button{font-family:Georgia,serif;cursor:pointer}
-    input{font-family:Georgia,serif}
-    .scrollx{display:flex;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch}
-    .scrollx::-webkit-scrollbar{display:none}
+    html,body{height:100%}
+    body{
+      background:#f5f0e8;color:#2a2420;
+      font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI','Helvetica Neue',Arial,sans-serif;
+      -webkit-tap-highlight-color:transparent;
+      -webkit-font-smoothing:antialiased;
+      overscroll-behavior-y:contain;
+      padding-top:env(safe-area-inset-top);
+      padding-bottom:env(safe-area-inset-bottom);
+    }
+    #root{min-height:100%}
+    @keyframes sheetFadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes sheetSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    /* hide scrollbars in carousel */
+    ::-webkit-scrollbar{display:none}
+    button{font-family:inherit}
+    input,button{-webkit-appearance:none;appearance:none}
   </style>
 </head>
 <body>
-<div id="root" style="padding:40px;text-align:center;color:#9a8878;font-style:italic">загружаю...</div>
+  <div id="root" style="padding:40px;text-align:center;color:#9a8878;font-style:italic">загружаю…</div>
 
-<script>
-// ═══════════════════════════════════════════════════════
-//  ДАННЫЕ
-// ═══════════════════════════════════════════════════════
-var STEPS = [
-  {id:1,  phase:"📝 Подготовка",   task:"Придумать сценарий",                                     who:"Gemini + Claude"},
-  {id:2,  phase:"🎬 Производство",  task:"Снять видео",                                            who:"Ты"},
-  {id:3,  phase:"🎬 Производство",  task:"Смонтировать видео",                                     who:"Ты"},
-  {id:4,  phase:"📤 Публикация",    task:"Загрузить ролик на YouTube",                             who:"Ты"},
-  {id:5,  phase:"📤 Публикация",    task:"Выгрузить субтитры через YouTube",                       who:"Ты"},
-  {id:6,  phase:"📤 Публикация",    task:"Перевести субтитры, название и описание на английский",  who:"Gemini"},
-  {id:7,  phase:"📤 Публикация",    task:"Описание на русском и английском + заголовки",           who:"Gemini"},
-  {id:8,  phase:"🎨 Оформление",   task:"Сделать обложку для YouTube",                            who:"ChatGPT"},
-  {id:9,  phase:"📣 Продвижение",  task:"Написать пост в Сообщество YouTube",                     who:"Gemini / ChatGPT"},
-  {id:10, phase:"📣 Продвижение",  task:"Выложить пост в Telegram с ссылкой на YouTube",          who:"ChatGPT"},
-  {id:11, phase:"📣 Продвижение",  task:"Сделать фото / обложку для Telegram",                    who:"ChatGPT"}
-];
-var WHO = {
-  "Gemini + Claude":  {bg:"#ede9fe",tx:"#6d28d9",br:"#c4b5fd"},
-  "Ты":               {bg:"#fce7f3",tx:"#be185d",br:"#f9a8d4"},
-  "Gemini":           {bg:"#dbeafe",tx:"#1d4ed8",br:"#93c5fd"},
-  "ChatGPT":          {bg:"#d1fae5",tx:"#065f46",br:"#6ee7b7"},
-  "Gemini / ChatGPT": {bg:"#fef9c3",tx:"#854d0e",br:"#fde047"}
-};
-var PHASES = [];
-for(var i=0;i<STEPS.length;i++){
-  if(PHASES.indexOf(STEPS[i].phase)===-1) PHASES.push(STEPS[i].phase);
-}
-var TOTAL = STEPS.length;
+  <!-- React + Babel -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
-// ═══════════════════════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════════════════════
-var S = {
-  videos: [{id:1,name:"Видео 1",checked:{}},{id:2,name:"Видео 2",checked:{}},{id:3,name:"Видео 3",checked:{}}],
-  activeId: 1,
-  editingId: null,
-  showOverview: false,
-  syncLabel: "💾 локально",
-  user: null,
-  fbReady: false,
-  firstLoad: true
-};
+  <!-- App modules -->
+  <script type="text/babel" src="app-data.jsx"></script>
+  <script type="text/babel" src="app-sheets.jsx"></script>
+  <script type="text/babel" src="app.jsx"></script>
 
-// ═══════════════════════════════════════════════════════
-//  ЛОКАЛЬНОЕ ХРАНЕНИЕ
-// ═══════════════════════════════════════════════════════
-function loadLocal(){
-  try{
-    var d = localStorage.getItem("checklist_v2");
-    if(d){ var p=JSON.parse(d); if(p&&p.length) S.videos=p; }
-  }catch(e){}
-}
-function saveLocal(vids){
-  try{ localStorage.setItem("checklist_v2", JSON.stringify(vids)); }catch(e){}
-}
-loadLocal();
+  <!-- Sync layer + bootstrap -->
+  <script type="text/babel">
+    // ─────────────────────────────────────────────────────────────
+    // Persistence: localStorage (always) + Firebase (when signed in)
+    // ─────────────────────────────────────────────────────────────
+    const LS_KEY = 'checklist_v3';   // new key; we read v2 once to migrate
+    const LEGACY_KEY = 'checklist_v2';
 
-// ═══════════════════════════════════════════════════════
-//  FIREBASE (загружаем динамически)
-// ═══════════════════════════════════════════════════════
-var db=null, auth=null, fbUnsub=null, saveTimer=null;
+    function loadLocal() {
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (raw) return appMigrate(JSON.parse(raw));
+        // One-time migration from the old single-array format
+        const legacy = localStorage.getItem(LEGACY_KEY);
+        if (legacy) {
+          const parsed = JSON.parse(legacy);
+          const migrated = appMigrate(parsed);
+          localStorage.setItem(LS_KEY, JSON.stringify(migrated));
+          return migrated;
+        }
+      } catch (e) {}
+      return appInitialState();
+    }
+    function saveLocal(state) {
+      try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+    }
 
-function loadScript(src, cb){
-  var s=document.createElement("script");
-  s.src=src;
-  s.onload=cb;
-  s.onerror=function(){ cb(new Error("fail")); };
-  document.head.appendChild(s);
-}
+    // ─── Firebase (lazy-loaded — same project as before) ───
+    let db = null, auth = null, fbUnsub = null, saveTimer = null;
+    let setReactBridge = null; // set from inside App via React state hooks below
 
-function initFirebase(){
-  loadScript("https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js", function(e1){
-    if(e1){ setSyncLabel("только локально"); return; }
-    loadScript("https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js", function(e2){
-      if(e2){ setSyncLabel("только локально"); return; }
-      loadScript("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js", function(e3){
-        if(e3){ setSyncLabel("только локально"); return; }
-        try{
-          firebase.initializeApp({
-            apiKey:"AIzaSyAwhbOo4kQ_fsOnHTKYvc7ogg1YO2CGqwA",
-            authDomain:"checklist-8598f.firebaseapp.com",
-            projectId:"checklist-8598f",
-            storageBucket:"checklist-8598f.firebasestorage.app",
-            messagingSenderId:"336930799163",
-            appId:"1:336930799163:web:775f3b715e8ea1317ba61e"
-          });
-          auth=firebase.auth();
-          db=firebase.firestore();
-          S.fbReady=true;
-          auth.onAuthStateChanged(function(u){
-            S.user=u;
-            S.firstLoad=true;
-            if(fbUnsub){ fbUnsub(); fbUnsub=null; }
-            if(u){
-              setSyncLabel("подключаю...");
-              fbUnsub=db.collection("users").doc(u.uid).onSnapshot(function(snap){
-                if(snap.exists && snap.data().videos && snap.data().videos.length){
-                  var v=snap.data().videos;
-                  S.videos=v;
-                  if(S.firstLoad){ S.activeId=v[0].id; S.firstLoad=false; }
+    function loadScript(src) {
+      return new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = src; s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+
+    async function initFirebase(handlers) {
+      try {
+        await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js');
+        firebase.initializeApp({
+          apiKey: 'AIzaSyAwhbOo4kQ_fsOnHTKYvc7ogg1YO2CGqwA',
+          authDomain: 'checklist-8598f.firebaseapp.com',
+          projectId: 'checklist-8598f',
+          storageBucket: 'checklist-8598f.firebasestorage.app',
+          messagingSenderId: '336930799163',
+          appId: '1:336930799163:web:775f3b715e8ea1317ba61e',
+        });
+        auth = firebase.auth();
+        db = firebase.firestore();
+        handlers.onReady();
+        auth.onAuthStateChanged(u => {
+          if (fbUnsub) { fbUnsub(); fbUnsub = null; }
+          handlers.onUser(u);
+          if (u) {
+            handlers.onSync('подключаю…');
+            fbUnsub = db.collection('users').doc(u.uid).onSnapshot(snap => {
+              if (snap.exists && snap.data()) {
+                // Pull remote state if it's not empty
+                const remote = snap.data();
+                if (remote.videos && remote.videos.length) {
+                  handlers.onRemote(appMigrate(remote));
                 }
-                setSyncLabel("✓ сохранено");
-                render();
-              }, function(){ setSyncLabel("⚠ ошибка"); });
-            } else {
-              setSyncLabel("не вошла");
-              render();
-            }
-          });
-        }catch(err){ setSyncLabel("только локально"); }
-      });
-    });
-  });
-}
-
-function setSyncLabel(t){ S.syncLabel=t; }
-
-function saveToFirebase(vids){
-  if(!db||!S.user) return;
-  clearTimeout(saveTimer);
-  setSyncLabel("сохраняю...");
-  saveTimer=setTimeout(function(){
-    db.collection("users").doc(S.user.uid).set({videos:vids},{merge:true})
-      .then(function(){ setSyncLabel("✓ сохранено"); render(); })
-      .catch(function(){ setSyncLabel("⚠ ошибка"); render(); });
-  },600);
-}
-
-// ═══════════════════════════════════════════════════════
-//  ACTIONS
-// ═══════════════════════════════════════════════════════
-function save(vids){
-  S.videos=vids;
-  saveLocal(vids);
-  saveToFirebase(vids);
-  render();
-}
-function updateVideo(id,patch){
-  save(S.videos.map(function(v){ return v.id===id?Object.assign({},v,patch):v; }));
-}
-function toggle(sid){
-  var active=getActive();
-  var c=Object.assign({},active.checked);
-  c[sid]=!c[sid];
-  updateVideo(S.activeId,{checked:c});
-}
-function resetVideo(){ updateVideo(S.activeId,{checked:{}}); }
-function addVideo(){
-  var id=Date.now();
-  save(S.videos.concat([{id:id,name:"Видео "+(S.videos.length+1),checked:{}}]));
-  S.activeId=id; S.editingId=id; S.showOverview=false;
-  render();
-}
-function deleteVideo(id){
-  var r=S.videos.filter(function(v){ return v.id!==id; });
-  save(r);
-  if(S.activeId===id&&r.length){ S.activeId=r[0].id; }
-  render();
-}
-function login(){ if(auth) auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
-function logout(){ if(auth) auth.signOut().then(function(){ S.user=null; render(); }); }
-function getActive(){ return S.videos.filter(function(v){ return v.id===S.activeId; })[0]; }
-
-// ═══════════════════════════════════════════════════════
-//  RENDER HELPERS
-// ═══════════════════════════════════════════════════════
-function div(style){ var el=document.createElement("div"); css(el,style); return el; }
-function span(txt,style){ var el=document.createElement("span"); el.textContent=txt||""; if(style)css(el,style); return el; }
-function p(txt,style){ var el=document.createElement("p"); el.textContent=txt||""; if(style)css(el,style); return el; }
-function h1(txt,style){ var el=document.createElement("h1"); el.textContent=txt||""; if(style)css(el,style); return el; }
-function btn(txt,style,cb){ var el=document.createElement("button"); el.textContent=txt||""; if(style)css(el,style); el.addEventListener("click",cb); return el; }
-function img(src,style){ var el=document.createElement("img"); el.src=src||""; if(style)css(el,style); return el; }
-function inp(val,style){ var el=document.createElement("input"); el.value=val||""; if(style)css(el,style); return el; }
-function add(parent){ for(var i=1;i<arguments.length;i++) if(arguments[i]) parent.appendChild(arguments[i]); return parent; }
-function css(el,s){
-  var map={
-    flexDirection:"flex-direction",alignItems:"align-items",justifyContent:"justify-content",
-    flexShrink:"flex-shrink",flexWrap:"flex-wrap",overflowX:"overflow-x",
-    borderBottom:"border-bottom",borderRadius:"border-radius",borderTop:"border-top",
-    fontSize:"font-size",fontWeight:"font-weight",fontStyle:"font-style",fontFamily:"font-family",
-    textAlign:"text-align",textTransform:"text-transform",textDecoration:"text-decoration",
-    letterSpacing:"letter-spacing",lineHeight:"line-height",
-    marginBottom:"margin-bottom",marginTop:"margin-top",marginLeft:"margin-left",marginRight:"margin-right",
-    paddingBottom:"padding-bottom",paddingTop:"padding-top",paddingLeft:"padding-left",paddingRight:"padding-right",
-    maxWidth:"max-width",minHeight:"min-height",
-    boxShadow:"box-shadow",whiteSpace:"white-space",overflowX:"overflow-x",overflow:"overflow",
-    textOverflow:"text-overflow",WebkitOverflowScrolling:"-webkit-overflow-scrolling",
-    background:"background",color:"color",border:"border",cursor:"cursor",
-    display:"display",width:"width",height:"height",
-    flex:"flex",gap:"gap",padding:"padding",margin:"margin"
-  };
-  Object.keys(s).forEach(function(k){
-    var prop=map[k]||k;
-    var val=s[k];
-    if(val!==undefined&&val!==null) el.style.setProperty(prop,String(val));
-  });
-}
-
-// ═══════════════════════════════════════════════════════
-//  RENDER
-// ═══════════════════════════════════════════════════════
-function render(){
-  var root=document.getElementById("root");
-  while(root.firstChild) root.removeChild(root.firstChild);
-  root.appendChild(buildScreen());
-}
-
-function buildScreen(){
-  var wrap=div({minHeight:"100vh",background:"#f5f0e8"});
-
-  // ── Шапка ──
-  var hdr=div({display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 18px",borderBottom:"1px solid #e5ddd0",background:"#fffdf8"});
-  var left=div({display:"flex",alignItems:"center",gap:"10px"});
-  if(S.user&&S.user.photoURL) add(left,img(S.user.photoURL,{width:"30px",height:"30px",borderRadius:"50%"}));
-  var name=S.user?S.user.displayName?S.user.displayName.split(" ")[0]:"":"";
-  add(left,span(name,{color:"#9a8878",fontSize:"14px"}));
-  add(left,span(S.syncLabel,{color:"#a0b090",fontSize:"11px"}));
-  add(hdr,left);
-  if(S.fbReady&&!S.user){
-    add(hdr,btn("🔑 Войти",{background:"#8b5e3c",border:"none",color:"#fff",padding:"7px 16px",borderRadius:"8px",fontSize:"14px"},login));
-  } else if(S.user){
-    add(hdr,btn("выйти",{background:"transparent",border:"1px solid #e5ddd0",color:"#9a8878",padding:"5px 14px",borderRadius:"8px",fontSize:"13px"},logout));
-  }
-  add(wrap,hdr);
-
-  // ── Вкладки ──
-  var tabs=div({display:"flex",alignItems:"center",overflowX:"auto",borderBottom:"1px solid #e5ddd0",background:"#fffdf8",padding:"0 18px"});
-  tabs.className="scrollx";
-
-  // Обзор
-  var ovActive=S.showOverview;
-  var ovTab=div({display:"flex",alignItems:"center",padding:"14px 14px 12px",cursor:"pointer",flexShrink:"0",borderBottom:ovActive?"3px solid #c4956a":"3px solid transparent"});
-  ovTab.appendChild(span("📋 Обзор",{fontSize:"15px",color:ovActive?"#c4956a":"#9a8878",fontWeight:ovActive?"bold":"normal",whiteSpace:"nowrap"}));
-  ovTab.addEventListener("click",function(){ S.showOverview=true; S.editingId=null; render(); });
-  add(tabs,ovTab);
-
-  // Разделитель
-  var sep=div({width:"1px",height:"20px",background:"#e5ddd0",flexShrink:"0",margin:"0 6px"});
-  add(tabs,sep);
-
-  // Видео-вкладки
-  S.videos.forEach(function(v){
-    var vDone=0;
-    STEPS.forEach(function(s){ if(v.checked[s.id]) vDone++; });
-    var isAct=!S.showOverview&&v.id===S.activeId;
-    var tab=div({display:"flex",alignItems:"center",gap:"7px",padding:"14px 14px 12px",cursor:"pointer",flexShrink:"0",borderBottom:isAct?"3px solid #8b5e3c":"3px solid transparent"});
-    tab.addEventListener("click",function(){ S.activeId=v.id; S.showOverview=false; S.editingId=null; render(); });
-
-    if(S.editingId===v.id){
-      var field=inp(v.name,{background:"transparent",border:"none",borderBottom:"1px solid #8b5e3c",color:"#2a2420",fontSize:"15px",width:"120px"});
-      field.addEventListener("click",function(e){ e.stopPropagation(); });
-      field.addEventListener("input",function(){
-        // только обновляем данные, без перерисовки
-        S.videos = S.videos.map(function(v2){ return v2.id===v.id ? Object.assign({},v2,{name:field.value}) : v2; });
-        saveLocal(S.videos);
-        // обновляем текст в вкладке без полного ре-рендера
-        var tabLabel = document.getElementById("tablabel-"+v.id);
-        if(tabLabel) tabLabel.textContent = field.value || " ";
-      });
-      field.addEventListener("blur",function(){
-        saveToFirebase(S.videos);
-        S.editingId=null; render();
-      });
-      field.addEventListener("keydown",function(e){ if(e.key==="Enter"){
-        saveToFirebase(S.videos);
-        S.editingId=null; render();
-      } });
-      add(tab,field);
-      setTimeout(function(){ field.focus(); },50);
-    } else {
-      var lbl=span(v.name,{fontSize:"15px",color:isAct?"#8b5e3c":"#9a8878",fontWeight:isAct?"bold":"normal",maxWidth:"140px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"});
-      lbl.id = "tablabel-"+v.id;
-      lbl.addEventListener("dblclick",function(e){ e.stopPropagation(); S.editingId=v.id; render(); });
-      add(tab,lbl);
-    }
-
-    var badge=span(vDone===TOTAL?"✓":(vDone+"/"+TOTAL),{fontSize:"11px",color:vDone===TOTAL?"#4a7c59":"#9a8878",background:vDone===TOTAL?"#d1fae5":"#ede8e0",padding:"2px 7px",borderRadius:"20px",flexShrink:"0"});
-    add(tab,badge);
-
-    if(S.videos.length>1&&isAct){
-      var x=span("✕",{color:"#c0b0a0",fontSize:"13px",cursor:"pointer"});
-      x.addEventListener("click",function(e){ e.stopPropagation(); deleteVideo(v.id); });
-      add(tab,x);
-    }
-    add(tabs,tab);
-  });
-
-  var addTab=div({display:"flex",alignItems:"center",padding:"14px 14px 12px",cursor:"pointer",flexShrink:"0",borderBottom:"3px solid transparent",fontSize:"22px",color:"#9a8878"});
-  addTab.textContent="+";
-  addTab.addEventListener("click",addVideo);
-  add(tabs,addTab);
-  add(wrap,tabs);
-
-  // ── Контент ──
-  var content=div({maxWidth:"620px",margin:"0 auto",padding:"24px 18px 60px"});
-
-  if(S.showOverview){
-    buildOverview(content);
-  } else {
-    buildChecklist(content);
-  }
-
-  add(wrap,content);
-  return wrap;
-}
-
-function buildOverview(content){
-  var overview=[];
-  for(var i=0;i<STEPS.length;i++){
-    var step=STEPS[i];
-    var pending=S.videos.filter(function(v){ return !v.checked[step.id]; });
-    if(pending.length>0) overview.push({step:step,pending:pending});
-  }
-
-  add(content,p("мой канал",{color:"#9a8878",fontSize:"12px",letterSpacing:"3px",textTransform:"uppercase",marginBottom:"8px"}));
-  add(content,h1("Что ещё не сделано",{fontSize:"26px",fontWeight:"normal",fontStyle:"italic",color:"#6b4423",marginBottom:"6px"}));
-  var total=0; overview.forEach(function(x){ total+=x.pending.length; });
-  add(content,p(total+" задач осталось",{color:"#9a8878",fontSize:"14px",marginBottom:"24px"}));
-
-  if(overview.length===0){
-    var fin=div({textAlign:"center",padding:"36px",background:"#fffbf0",borderRadius:"18px",border:"1px solid #f0d080"});
-    add(fin,p("🎉",{fontSize:"34px",marginBottom:"8px"}));
-    add(fin,p("Всё сделано! Умница.",{color:"#8b6914",fontStyle:"italic",fontSize:"18px"}));
-    add(content,fin);
-    return;
-  }
-
-  overview.forEach(function(item){
-    var wc=WHO[item.step.who]||{bg:"#f3f4f6",tx:"#374151",br:"#d1d5db"};
-    var block=div({marginBottom:"20px"});
-
-    var taskRow=div({display:"flex",alignItems:"center",gap:"8px",marginBottom:"8px"});
-    var badge=span(item.step.who,{fontSize:"11px",padding:"3px 9px",borderRadius:"20px",background:wc.bg,color:wc.tx,border:"1px solid "+wc.br,whiteSpace:"nowrap",flexShrink:"0"});
-    var taskText=p(item.step.task,{fontSize:"14px",color:"#6b4423",fontWeight:"bold",margin:"0",lineHeight:"1.3"});
-    add(taskRow,badge,taskText);
-    add(block,taskRow);
-
-    item.pending.forEach(function(v){
-      var card=div({display:"flex",alignItems:"center",gap:"12px",padding:"13px 16px",marginBottom:"6px",borderRadius:"12px",background:"#fffdf8",border:"1px solid #e5ddd0",cursor:"pointer"});
-      var checkbox=div({width:"20px",height:"20px",borderRadius:"6px",flexShrink:"0",border:"2px solid #c4a882",background:"transparent"});
-      var name=p(v.name,{margin:"0",fontSize:"16px",color:"#2a2420",flex:"1"});
-      var arrow=span("→",{color:"#c4a882",fontSize:"18px"});
-      add(card,checkbox,name,arrow);
-      (function(vid){ card.addEventListener("click",function(){ S.activeId=vid.id; S.showOverview=false; render(); }); })(v);
-      add(block,card);
-    });
-    add(content,block);
-  });
-}
-
-function buildChecklist(content){
-  var active=getActive();
-  if(!active) return;
-
-  var done=0;
-  STEPS.forEach(function(s){ if(active.checked[s.id]) done++; });
-  var pct=Math.round((done/TOTAL)*100);
-
-  add(content,p("мой канал",{color:"#9a8878",fontSize:"12px",letterSpacing:"3px",textTransform:"uppercase",marginBottom:"8px"}));
-
-  var titleRow=div({display:"flex",alignItems:"center",gap:"10px",marginBottom:"6px"});
-  var title=h1(active.name,{fontSize:"26px",fontWeight:"normal",fontStyle:"italic",color:"#6b4423",cursor:"text"});
-  title.addEventListener("dblclick",function(){ S.editingId=active.id; render(); });
-  var pencil=span("✎",{color:"#c0a888",fontSize:"18px",cursor:"pointer"});
-  pencil.addEventListener("click",function(){ S.editingId=active.id; render(); });
-  add(titleRow,title,pencil);
-  add(content,titleRow);
-  add(content,p(done+" из "+TOTAL+" шагов выполнено",{color:"#9a8878",fontSize:"14px",marginBottom:"22px"}));
-
-  // Прогресс
-  var pbWrap=div({height:"6px",background:"#e5ddd0",borderRadius:"3px",marginBottom:"28px",overflow:"hidden"});
-  var pbFill=div({height:"100%",background:"linear-gradient(90deg,#c4956a,#e8a87c)",borderRadius:"3px",width:pct+"%"});
-  add(pbWrap,pbFill);
-  add(content,pbWrap);
-
-  // Шаги
-  PHASES.forEach(function(phase){
-    var sec=div({marginBottom:"24px"});
-    var secLabel=p(phase,{fontSize:"11px",letterSpacing:"2px",textTransform:"uppercase",color:"#9a8878",marginBottom:"10px",paddingLeft:"4px"});
-    add(sec,secLabel);
-
-    STEPS.filter(function(s){ return s.phase===phase; }).forEach(function(step){
-      var isDone=!!active.checked[step.id];
-      var wc=WHO[step.who]||{bg:"#f3f4f6",tx:"#374151",br:"#d1d5db"};
-
-      var card=div({display:"flex",alignItems:"center",gap:"14px",padding:"15px 14px",marginBottom:"9px",borderRadius:"14px",cursor:"pointer",background:isDone?"#ede8e0":"#fffdf8",border:"1px solid "+(isDone?"#d5ccc0":"#e5ddd0")});
-      if(!isDone) card.style.setProperty("box-shadow","0 1px 5px rgba(0,0,0,0.05)");
-
-      // Чекбокс
-      var cb=div({width:"26px",height:"26px",borderRadius:"8px",flexShrink:"0",border:"2px solid "+(isDone?"#8b5e3c":"#c4a882"),background:isDone?"#8b5e3c":"transparent",display:"flex",alignItems:"center",justifyContent:"center"});
-      if(isDone){
-        var svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
-        svg.setAttribute("width","13"); svg.setAttribute("height","11"); svg.setAttribute("viewBox","0 0 13 11"); svg.setAttribute("fill","none");
-        var pt=document.createElementNS("http://www.w3.org/2000/svg","path");
-        pt.setAttribute("d","M1 5.5L5 9.5L12 1"); pt.setAttribute("stroke","white"); pt.setAttribute("stroke-width","2.2"); pt.setAttribute("stroke-linecap","round"); pt.setAttribute("stroke-linejoin","round");
-        svg.appendChild(pt); cb.appendChild(svg);
+              }
+              handlers.onSync('✓ сохранено');
+            }, () => handlers.onSync('⚠ ошибка'));
+          } else {
+            handlers.onSync('локально');
+          }
+        });
+      } catch (e) {
+        handlers.onSync('локально (нет связи)');
       }
-      add(card,cb);
+    }
 
-      var taskText=p(step.task,{flex:"1",margin:"0",fontSize:"16px",lineHeight:"1.5",color:isDone?"#b8a898":"#2a2420",textDecoration:isDone?"line-through":"none"});
-      add(card,taskText);
+    function saveToFirebase(state, onSync) {
+      if (!db || !auth?.currentUser) return;
+      clearTimeout(saveTimer);
+      onSync('сохраняю…');
+      saveTimer = setTimeout(() => {
+        db.collection('users').doc(auth.currentUser.uid).set(state, { merge: true })
+          .then(() => onSync('✓ сохранено'))
+          .catch(() => onSync('⚠ ошибка'));
+      }, 700);
+    }
 
-      var who=span(step.who,{fontSize:"12px",padding:"4px 10px",borderRadius:"20px",background:wc.bg,color:wc.tx,border:"1px solid "+wc.br,whiteSpace:"nowrap",flexShrink:"0"});
-      add(card,who);
+    // ─────────────────────────────────────────────────────────────
+    // Root: bridges sync layer ↔ React state
+    // ─────────────────────────────────────────────────────────────
+    function Root() {
+      const [bootState, setBootState] = React.useState(() => loadLocal());
+      const [syncLabel, setSyncLabel] = React.useState('локально');
+      const [user, setUser] = React.useState(null);
+      const [fbReady, setFbReady] = React.useState(false);
+      // Used to force-remount App when a remote snapshot arrives (so it
+      // re-seeds activeId etc from the new state).
+      const [seedKey, setSeedKey] = React.useState(0);
 
-      (function(sid){ card.addEventListener("click",function(){ toggle(sid); }); })(step.id);
-      add(sec,card);
-    });
-    add(content,sec);
-  });
+      React.useEffect(() => {
+        initFirebase({
+          onReady: () => setFbReady(true),
+          onUser: (u) => setUser(u),
+          onSync: (l) => setSyncLabel(l),
+          onRemote: (remote) => { setBootState(remote); setSeedKey(k => k + 1); },
+        });
+      }, []);
 
-  if(done===TOTAL){
-    var fin=div({textAlign:"center",padding:"28px",background:"#fffbf0",borderRadius:"18px",border:"1px solid #f0d080",marginTop:"8px"});
-    add(fin,p("🎉",{fontSize:"34px",marginBottom:"8px"}));
-    add(fin,p("Ролик выпущен! Умница.",{color:"#8b6914",fontStyle:"italic",fontSize:"18px"}));
-    add(content,fin);
-  }
+      const persist = React.useCallback((state) => {
+        saveLocal(state);
+        saveToFirebase(state, setSyncLabel);
+      }, []);
 
-  var rstBtn=btn("сбросить чек-лист этого видео",{marginTop:"24px",background:"transparent",border:"1px solid #e5ddd0",color:"#9a8878",padding:"12px 20px",borderRadius:"12px",fontSize:"14px",display:"block",width:"100%"},resetVideo);
-  add(content,rstBtn);
-}
+      const login = () => {
+        if (!auth) return;
+        auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+          .catch(() => setSyncLabel('⚠ не удалось войти'));
+      };
+      const logout = () => { if (auth) auth.signOut(); };
 
-// ── Старт ──
-render();
-initFirebase();
-</script>
+      return (
+        <App
+          key={seedKey}
+          initialState={bootState}
+          onPersist={persist}
+          syncLabel={syncLabel}
+          user={user}
+          onLogin={login}
+          onLogout={logout}
+          fbReady={fbReady}
+        />
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+  </script>
 </body>
 </html>
