@@ -90,17 +90,6 @@
         auth = firebase.auth();
         db = firebase.firestore();
         handlers.onReady();
-
-        // Handle redirect result ONLY if we initiated a redirect (flag prevents loop)
-        if (sessionStorage.getItem('fb_auth_pending')) {
-          sessionStorage.removeItem('fb_auth_pending');
-          auth.getRedirectResult().catch(err => {
-            if (err && err.code !== 'auth/no-auth-event') {
-              console.error('redirect result error:', err.code);
-            }
-          });
-        }
-
         auth.onAuthStateChanged(u => {
           if (fbUnsub) { fbUnsub(); fbUnsub = null; }
           hasPulledOnce = false;
@@ -109,16 +98,12 @@
             handlers.onSync('подключаю…');
             fbUnsub = db.collection('users').doc(u.uid).onSnapshot(snap => {
               if (!hasPulledOnce) {
-                // ── First snapshot: seed state from Firebase ──────────────
                 if (snap.exists && snap.data()) {
                   const remote = snap.data();
-                  if (remote.videos && remote.videos.length) {
-                    handlers.onRemote(appMigrate(remote));
-                  }
+                  if (remote.videos && remote.videos.length) handlers.onRemote(appMigrate(remote));
                 }
                 hasPulledOnce = true;
               }
-              // Subsequent snapshots are echoes of our own saves — just update sync label
               handlers.onSync('✓ сохранено');
             }, () => handlers.onSync('⚠ ошибка'));
           } else {
@@ -167,18 +152,15 @@
 
       const login = () => {
         if (!auth) { setSyncLabel('⚠ Firebase не загрузился'); return; }
-        const provider = new firebase.auth.GoogleAuthProvider();
         const isIOSPWA = window.navigator.standalone === true;
         if (isIOSPWA) {
-          // iOS PWA: use redirect but set a flag so we don't loop
-          sessionStorage.setItem('fb_auth_pending', '1');
-          auth.signInWithRedirect(provider);
+          // iOS PWA cannot do Google popup/redirect — it's a WebKit bug.
+          // Solution: user must sign in once in Safari, then PWA inherits the session.
+          setSyncLabel('⚠ войди в Safari сначала');
+          alert('На iPhone: сначала открой это приложение в браузере Safari и войди через Google. После этого добавь на экран домой — сессия сохранится.');
         } else {
-          // Browser (desktop + iOS Safari): popup works fine
-          auth.signInWithPopup(provider).catch(err => {
-            console.error('login error:', err?.code, err?.message);
-            setSyncLabel('⚠ ' + (err?.message || 'не удалось войти'));
-          });
+          auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+            .catch((err) => { console.error(err); setSyncLabel('⚠ ' + (err?.message || 'не удалось войти')); });
         }
       };
       const logout = () => { if (auth) auth.signOut(); };
