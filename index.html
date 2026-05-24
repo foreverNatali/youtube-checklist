@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Мой канал · Чек-лист</title>
   <meta name="theme-color" content="#f5f0e8" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -22,13 +25,10 @@
       padding-top:env(safe-area-inset-top);
       padding-bottom:env(safe-area-inset-bottom);
     }
-    #root{min-height:100%;max-width:480px;margin:0 auto;background:#f5f0e8}
-    @media (min-width: 600px){
-      body{ background:#e8dfd0; }
-      #root{ box-shadow:0 0 60px rgba(0,0,0,0.08); }
-    }
+    #root{min-height:100%}
     @keyframes sheetFadeIn{from{opacity:0}to{opacity:1}}
     @keyframes sheetSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    /* hide scrollbars in carousel */
     ::-webkit-scrollbar{display:none}
     button{font-family:inherit}
     input,button{-webkit-appearance:none;appearance:none}
@@ -37,34 +37,47 @@
 <body>
   <div id="root" style="padding:40px;text-align:center;color:#9a8878;font-style:italic">загружаю…</div>
 
+  <!-- React + Babel -->
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
-  <script type="text/babel" src="app-data.jsx"></script>
-  <script type="text/babel" src="app-sheets.jsx"></script>
-  <script type="text/babel" src="app.jsx"></script>
+  <!-- App modules — version query forces Safari to refetch on each release -->
+  <script type="text/babel" src="app-data.jsx?v=20260524d"></script>
+  <script type="text/babel" src="app-sheets.jsx?v=20260524d"></script>
+  <script type="text/babel" src="app.jsx?v=20260524d"></script>
 
+  <!-- Sync layer + bootstrap -->
   <script type="text/babel">
-    const LS_KEY = 'checklist_v3';
+    // ─────────────────────────────────────────────────────────────
+    // Persistence: localStorage (always) + Firebase (when signed in)
+    // ─────────────────────────────────────────────────────────────
+    const LS_KEY = 'checklist_v3';   // new key; we read v2 once to migrate
     const LEGACY_KEY = 'checklist_v2';
 
     function loadLocal() {
       try {
         const raw = localStorage.getItem(LS_KEY);
         if (raw) return appMigrate(JSON.parse(raw));
+        // One-time migration from the old single-array format
         const legacy = localStorage.getItem(LEGACY_KEY);
         if (legacy) {
-          const migrated = appMigrate(JSON.parse(legacy));
+          const parsed = JSON.parse(legacy);
+          const migrated = appMigrate(parsed);
           localStorage.setItem(LS_KEY, JSON.stringify(migrated));
           return migrated;
         }
       } catch (e) {}
       return appInitialState();
     }
-    function saveLocal(state) { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
+    function saveLocal(state) {
+      try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+    }
 
-    let db = null, auth = null, fbUnsub = null, saveTimer = null, hasPulledOnce = false;
+    // ─── Firebase (lazy-loaded — same project as before) ───
+    let db = null, auth = null, fbUnsub = null, saveTimer = null;
+    let hasPulledOnce = false; // don't push local state until we've pulled cloud
+    let setReactBridge = null; // set from inside App via React state hooks below
 
     function loadScript(src) {
       return new Promise((res, rej) => {
@@ -89,33 +102,42 @@
         });
         auth = firebase.auth();
         db = firebase.firestore();
+        // Persist auth across PWA / Safari sessions on iOS
+        try { await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
+        // Complete redirect sign-in if we just came back from Google
+        try { await auth.getRedirectResult(); } catch (e) { console.warn('redirect result', e); }
         handlers.onReady();
         auth.onAuthStateChanged(u => {
           if (fbUnsub) { fbUnsub(); fbUnsub = null; }
-          hasPulledOnce = false;
+          hasPulledOnce = false; // gate pushes until we've pulled fresh cloud
           handlers.onUser(u);
           if (u) {
             handlers.onSync('подключаю…');
             fbUnsub = db.collection('users').doc(u.uid).onSnapshot(snap => {
               if (snap.exists && snap.data()) {
+                // Pull remote state if it's not empty
                 const remote = snap.data();
-                if (remote.videos && remote.videos.length) handlers.onRemote(appMigrate(remote));
+                if (remote.videos && remote.videos.length) {
+                  handlers.onRemote(appMigrate(remote));
+                }
               }
-              hasPulledOnce = true;
+              hasPulledOnce = true; // safe to push from now on
               handlers.onSync('✓ сохранено');
             }, () => handlers.onSync('⚠ ошибка'));
           } else {
-            handlers.onSync('локально');
+            handlers.onSync('не вошёл');
           }
         });
       } catch (e) {
-        handlers.onError(e?.message || 'нет связи');
+        console.error('Firebase init failed', e);
+        handlers.onError(e?.message || 'не удалось загрузить Firebase');
         handlers.onSync('⚠ нет связи');
       }
     }
 
     function saveToFirebase(state, onSync) {
-      if (!db || !auth?.currentUser || !hasPulledOnce) return;
+      if (!db || !auth?.currentUser) return;
+      if (!hasPulledOnce) return; // wait until we've pulled cloud first
       clearTimeout(saveTimer);
       onSync('сохраняю…');
       saveTimer = setTimeout(() => {
@@ -125,12 +147,17 @@
       }, 700);
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // Root: bridges sync layer ↔ React state
+    // ─────────────────────────────────────────────────────────────
     function Root() {
       const [bootState, setBootState] = React.useState(() => loadLocal());
-      const [syncLabel, setSyncLabel] = React.useState('локально');
+      const [syncLabel, setSyncLabel] = React.useState('загружаю…');
       const [user, setUser] = React.useState(null);
       const [fbReady, setFbReady] = React.useState(false);
       const [fbError, setFbError] = React.useState(null);
+      // Used to force-remount App when a remote snapshot arrives (so it
+      // re-seeds activeId etc from the new state).
       const [seedKey, setSeedKey] = React.useState(0);
 
       React.useEffect(() => {
@@ -149,16 +176,51 @@
       }, []);
 
       const login = () => {
-        if (!auth) { setSyncLabel('⚠ Firebase не загрузился'); return; }
-        auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
-          .catch((err) => { console.error(err); setSyncLabel('⚠ ' + (err?.message || 'не удалось войти')); });
+        if (!auth) {
+          setSyncLabel('⚠ Firebase не загрузился — обнови страницу');
+          return;
+        }
+        setSyncLabel('открываю Google…');
+        const provider = new firebase.auth.GoogleAuthProvider();
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+          || window.matchMedia('(display-mode: standalone)').matches
+          || window.navigator.standalone;
+        if (isMobile) {
+          // iOS Safari / PWA: popups are blocked. Redirect goes through Google
+          // and returns via getRedirectResult() on next load.
+          auth.signInWithRedirect(provider).catch((err) => {
+            console.error(err);
+            setSyncLabel('⚠ ' + (err?.message || 'не удалось войти'));
+          });
+        } else {
+          auth.signInWithPopup(provider).catch((err) => {
+            // Some browsers block popup — fall back to redirect.
+            if (err && (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user' || err.code === 'auth/operation-not-supported-in-this-environment')) {
+              auth.signInWithRedirect(provider).catch((e2) => {
+                console.error(e2);
+                setSyncLabel('⚠ ' + (e2?.message || 'не удалось войти'));
+              });
+            } else {
+              console.error(err);
+              setSyncLabel('⚠ ' + (err?.message || 'не удалось войти'));
+            }
+          });
+        }
       };
       const logout = () => { if (auth) auth.signOut(); };
 
       return (
-        <App key={seedKey} initialState={bootState} onPersist={persist}
-          syncLabel={syncLabel} user={user} onLogin={login} onLogout={logout}
-          fbReady={fbReady} fbError={fbError} />
+        <App
+          key={seedKey}
+          initialState={bootState}
+          onPersist={persist}
+          syncLabel={syncLabel}
+          user={user}
+          onLogin={login}
+          onLogout={logout}
+          fbReady={fbReady}
+          fbError={fbError}
+        />
       );
     }
 
