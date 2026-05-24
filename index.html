@@ -164,29 +164,22 @@
         saveToFirebase(state, setSyncLabel);
       }, []);
 
-      // Try popup first (desktop), fall back to redirect if popup is blocked (iOS/mobile)
-      const login = async () => {
+      // iOS Safari blocks popups when user gesture is lost through async/await.
+      // Detect iOS and use redirect directly; desktop gets popup.
+      const login = () => {
         if (!auth) { setSyncLabel('⚠ Firebase не загрузился'); return; }
         const provider = new firebase.auth.GoogleAuthProvider();
-        try {
-          await auth.signInWithPopup(provider);
-        } catch (err) {
-          const isBlocked = err && (
-            err.code === 'auth/popup-blocked' ||
-            err.code === 'auth/popup-cancelled' ||
-            err.code === 'auth/cancelled-popup-request'
-          );
-          if (isBlocked) {
-            // Popup blocked (common on iOS Safari) — use redirect instead
-            try {
-              await auth.signInWithRedirect(provider);
-            } catch (e2) {
-              setSyncLabel('⚠ ' + (e2?.message || 'не удалось войти'));
-            }
-          } else if (err) {
-            console.error('login error:', err.code, err.message);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (isIOS) {
+          // Redirect flow for iOS — page reloads after Google auth
+          auth.signInWithRedirect(provider);
+        } else {
+          // Popup flow for desktop
+          auth.signInWithPopup(provider).catch(err => {
+            console.error('login error:', err?.code, err?.message);
             setSyncLabel('⚠ ' + (err?.message || 'не удалось войти'));
-          }
+          });
         }
       };
       const logout = () => { if (auth) auth.signOut(); };
