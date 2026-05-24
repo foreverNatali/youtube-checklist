@@ -22,8 +22,8 @@
       padding-top:env(safe-area-inset-top);
       padding-bottom:env(safe-area-inset-bottom);
     }
-    #root{min-height:100%;max-width:480px;margin:0 auto;background:#f5f0e8}
-    @media (min-width: 600px){
+    #root{min-height:100%;max-width:680px;margin:0 auto;background:#f5f0e8}
+    @media (min-width: 720px){
       body{ background:#e8dfd0; }
       #root{ box-shadow:0 0 60px rgba(0,0,0,0.08); }
     }
@@ -90,6 +90,14 @@
         auth = firebase.auth();
         db = firebase.firestore();
         handlers.onReady();
+
+        // Handle redirect result (for mobile Google sign-in)
+        auth.getRedirectResult().catch(err => {
+          if (err && err.code !== 'auth/cancelled-popup-request') {
+            console.error('redirect result error', err);
+          }
+        });
+
         auth.onAuthStateChanged(u => {
           if (fbUnsub) { fbUnsub(); fbUnsub = null; }
           hasPulledOnce = false;
@@ -97,11 +105,17 @@
           if (u) {
             handlers.onSync('подключаю…');
             fbUnsub = db.collection('users').doc(u.uid).onSnapshot(snap => {
-              if (snap.exists && snap.data()) {
-                const remote = snap.data();
-                if (remote.videos && remote.videos.length) handlers.onRemote(appMigrate(remote));
+              if (!hasPulledOnce) {
+                // ── First snapshot: seed state from Firebase ──────────────
+                if (snap.exists && snap.data()) {
+                  const remote = snap.data();
+                  if (remote.videos && remote.videos.length) {
+                    handlers.onRemote(appMigrate(remote));
+                  }
+                }
+                hasPulledOnce = true;
               }
-              hasPulledOnce = true;
+              // Subsequent snapshots are echoes of our own saves — just update sync label
               handlers.onSync('✓ сохранено');
             }, () => handlers.onSync('⚠ ошибка'));
           } else {
@@ -148,10 +162,14 @@
         saveToFirebase(state, setSyncLabel);
       }, []);
 
+      // Use signInWithRedirect for iOS Safari compatibility (no popup blocking)
       const login = () => {
         if (!auth) { setSyncLabel('⚠ Firebase не загрузился'); return; }
-        auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
-          .catch((err) => { console.error(err); setSyncLabel('⚠ ' + (err?.message || 'не удалось войти')); });
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithRedirect(provider).catch((err) => {
+          console.error(err);
+          setSyncLabel('⚠ ' + (err?.message || 'не удалось войти'));
+        });
       };
       const logout = () => { if (auth) auth.signOut(); };
 
